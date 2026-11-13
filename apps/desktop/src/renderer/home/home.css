@@ -1,0 +1,154 @@
+#root {
+  overflow-y: auto;
+}
+
+.home {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 20px 16px 32px;
+  display: grid;
+  gap: 16px;
+}
+
+.home h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
+
+.home h2 {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+.home p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 12px;
+  margin-top: 10px !important;
+}
+
+.captures {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.capture {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  padding: 16px 8px;
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.capture:hover {
+  border-color: var(--accent);
+}
+.capture .big {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.field > span:first-child {
+  width: 110px;
+  color: var(--muted);
+}
+
+.hotkey {
+  width: 190px;
+  cursor: pointer;
+  text-align: center;
+}
+.hotkey.recording {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pill {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+.pill.ok {
+  color: var(--ok);
+}
+.pill.bad {
+  color: var(--warn);
+}
+
+.check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+code {
+  font-family: ui-monospace, 'Cascadia Mono', 'Ubuntu Mono', monospace;
+  font-size: 12px;
+}
+
+.doctor {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: grid;
+  gap: 6px;
+}
+.doctor li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  line-height: 1.45;
+}
+.doctor .dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+  transform: translateY(-1px);
+}
+.doctor .warn .dot {
+  background: var(--warn);
+}
+.doctor .error .dot {
+  background: var(--danger);
+}
+
+@media (max-width: 520px) {
+  .captures {
+    grid-template-columns: 1fr;
+  }
+}

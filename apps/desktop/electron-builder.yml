@@ -1,0 +1,55 @@
+# Packaging (§13). Linux: .deb + AppImage. Windows: NSIS per-user.
+appId: works.telesto.Magpie
+productName: Magpie
+directories:
+  buildResources: resources
+  output: release/${version}
+files:
+  - out/**
+  - package.json
+  - '!**/*.map'
+  - '!src/**'
+  - '!scripts/**'
+  - '!test/**'
+asarUnpack:
+  - resources/**
+  - '**/node_modules/koffi/**'
+extraResources:
+  - from: resources/icons
+    to: icons
+fileAssociations:
+  - ext: magpie
+    name: Magpie project
+    description: Editable Magpie screenshot
+    mimeType: application/x-magpie
+    role: Editor
+linux:
+  # The installed .desktop file id MUST equal package.json desktopName,
+  # or GNOME denies global shortcuts and forgets the screenshot permission.
+  syncDesktopName: true
+  executableName: magpie
+  icon: resources/icons
+  category: Graphics
+  target:
+    - deb
+    - AppImage
+  desktop:
+    entry:
+      GenericName: Screenshot Tool
+      X-GNOME-UsesNotifications: 'true'
+deb:
+  depends:
+    - xdg-desktop-portal
+    - xdg-desktop-portal-gnome
+    - libnotify4
+    - libnss3
+appImage:
+  artifactName: Magpie-${version}-${arch}.AppImage
+win:
+  target:
+    - nsis
+  icon: resources/icons/256x256.png
+nsis:
+  oneClick: true
+  perMachine: false
+  artifactName: Magpie-Setup-${version}.exe

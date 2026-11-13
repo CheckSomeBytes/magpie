@@ -1,0 +1,19 @@
+{
+  "name": "magpie-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w magpie",
+    "build": "npm run build -w magpie",
+    "dist:linux": "npm run dist:linux -w magpie",
+    "dist:win": "npm run dist:win -w magpie",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,83 @@
+:root {
+  color-scheme: dark light;
+  --bg: #1b1d22;
+  --panel: #23262d;
+  --panel-2: #2b2f37;
+  --border: #383d47;
+  --text: #e8eaed;
+  --muted: #9aa0aa;
+  --accent: #4c8dff;
+  --accent-text: #ffffff;
+  --danger: #e5484d;
+  --ok: #30a46c;
+  --warn: #f5a524;
+  --radius: 8px;
+  font-family: system-ui, -apple-system, 'Segoe UI', Ubuntu, Cantarell, sans-serif;
+  font-size: 13px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --panel-2: #eef0f3;
+    --border: #d5d9e0;
+    --text: #1d2026;
+    --muted: #616875;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+button:hover {
+  border-color: var(--muted);
+}
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+input,
+select {
+  font: inherit;
+  color: inherit;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+
+kbd {
+  font-family: ui-monospace, 'Cascadia Mono', 'Ubuntu Mono', monospace;
+  font-size: 11px;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--panel-2);
+}

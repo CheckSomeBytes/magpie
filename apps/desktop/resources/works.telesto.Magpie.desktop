@@ -1,0 +1,25 @@
+[Desktop Entry]
+Type=Application
+Name=Magpie
+GenericName=Screenshot Tool
+Comment=Capture and annotate screenshots
+Exec=magpie %F
+Icon=works.telesto.Magpie
+Terminal=false
+Categories=Graphics;Utility;
+MimeType=application/x-magpie;
+StartupWMClass=works.telesto.Magpie
+X-GNOME-UsesNotifications=true
+Actions=region;window;full;
+
+[Desktop Action region]
+Name=Capture Region
+Exec=magpie --capture=region
+
+[Desktop Action window]
+Name=Capture Window
+Exec=magpie --capture=window
+
+[Desktop Action full]
+Name=Capture Full Screen
+Exec=magpie --capture=full
