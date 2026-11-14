@@ -46,14 +46,27 @@ export function unpackProject(bytes: Uint8Array): MagpieProject {
   return { manifest, doc, original: need(ORIGINAL), thumb };
 }
 
-/** Read only the manifest and thumbnail (for library listings). */
-export function peekProject(bytes: Uint8Array): Pick<MagpieProject, 'manifest' | 'thumb'> {
-  const entries = unzipSync(bytes, {
-    filter: (f) => f.name === MANIFEST || f.name === ANNOTATIONS || f.name.startsWith('thumb.'),
-  });
+/** Read everything except the original PNG (for the library index). */
+export function peekProject(bytes: Uint8Array): Omit<MagpieProject, 'original'> {
+  let entries: Record<string, Uint8Array>;
+  try {
+    entries = unzipSync(bytes, {
+      filter: (f) => f.name === MANIFEST || f.name === ANNOTATIONS || f.name.startsWith('thumb.'),
+    });
+  } catch (err) {
+    throw new FormatError(`Not a readable zip: ${(err as Error).message}`);
+  }
   const m = entries[MANIFEST];
   const a = entries[ANNOTATIONS];
   if (!m || !a) throw new FormatError('Missing manifest.json or annotations.json.');
-  const { manifest } = migrate(JSON.parse(strFromU8(m)), JSON.parse(strFromU8(a)));
-  return { manifest, thumb: manifest.thumb ? entries[manifest.thumb] ?? null : null };
+  let rawManifest: unknown;
+  let rawDoc: unknown;
+  try {
+    rawManifest = JSON.parse(strFromU8(m));
+    rawDoc = JSON.parse(strFromU8(a));
+  } catch {
+    throw new FormatError('manifest.json or annotations.json is not valid JSON.');
+  }
+  const { manifest, doc } = migrate(rawManifest, rawDoc);
+  return { manifest, doc, thumb: manifest.thumb ? entries[manifest.thumb] ?? null : null };
 }

@@ -5,6 +5,8 @@ export interface CliCommand {
   open: string[];
   /** --doctor: print diagnostics and exit. */
   doctor: boolean;
+  /** --library: open the library window. */
+  library: boolean;
 }
 
 const MODES: readonly CaptureMode[] = ['region', 'window', 'full'];
@@ -15,7 +17,7 @@ const MODES: readonly CaptureMode[] = ['region', 'window', 'full'];
  * executable and, in dev, the app path; we only look at flags and .magpie files.
  */
 export function parseCli(argv: readonly string[]): CliCommand {
-  const out: CliCommand = { capture: null, open: [], doctor: false };
+  const out: CliCommand = { capture: null, open: [], doctor: false, library: false };
   const asMode = (v: string | undefined): CaptureMode | null => {
     const m = v === 'fullscreen' ? 'full' : v;
     return m && (MODES as readonly string[]).includes(m) ? (m as CaptureMode) : null;
@@ -31,6 +33,7 @@ export function parseCli(argv: readonly string[]): CliCommand {
       } else bareCaptureFlag = true;
     } else if (arg.startsWith('--capture=')) out.capture = asMode(arg.slice('--capture='.length)) ?? out.capture;
     else if (arg === '--doctor') out.doctor = true;
+    else if (arg === '--library') out.library = true;
     else if (!arg.startsWith('-') && arg.toLowerCase().endsWith('.magpie')) out.open.push(arg);
   }
   // Chromium rewrites a forwarded (second-instance) argv as switches-then-positionals, so

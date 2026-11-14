@@ -30,6 +30,18 @@ const api: MagpieApi = {
   suspendHotkeys: (s) => ipcRenderer.send(CH.suspendHotkeys, s),
   chooseFolder: () => ipcRenderer.invoke(CH.chooseFolder),
   runDoctor: () => ipcRenderer.invoke(CH.runDoctor),
+
+  openLibrary: () => ipcRenderer.send(CH.openLibrary),
+  libraryQuery: (q) => ipcRenderer.invoke(CH.libraryQuery, q),
+  libraryOverview: () => ipcRenderer.invoke(CH.libraryOverview),
+  librarySetTitle: (id, title) => ipcRenderer.invoke(CH.librarySetTitle, id, title),
+  libraryAddTag: (ids, tag) => ipcRenderer.invoke(CH.libraryAddTag, ids, tag),
+  libraryRemoveTag: (ids, tag) => ipcRenderer.invoke(CH.libraryRemoveTag, ids, tag),
+  libraryTrash: (ids) => ipcRenderer.invoke(CH.libraryTrash, ids),
+  libraryOpen: (ids) => ipcRenderer.send(CH.libraryOpen, ids),
+  libraryReveal: (id) => ipcRenderer.send(CH.libraryReveal, id),
+  libraryRescan: () => ipcRenderer.invoke(CH.libraryRescan),
+  onLibraryChanged: (cb) => listen<[]>(CH.libraryChanged, cb),
 };
 
 contextBridge.exposeInMainWorld('magpie', api);

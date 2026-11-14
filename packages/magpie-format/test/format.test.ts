@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { strToU8, zipSync } from 'fflate';
 import {
   FORMAT_VERSION,
+  annotationText,
+  normalizeTags,
   FormatError,
   emptyDoc,
   migrate,
@@ -144,5 +146,23 @@ describe('steps', () => {
 
   it('computes the next number', () => {
     expect(nextStepNumber([step('a', 1), arrow])).toBe(2);
+  });
+});
+
+describe('library helpers', () => {
+  it('peek returns the doc too', () => {
+    const doc = { ...emptyDoc(), annotations: [arrow] };
+    const peek = peekProject(packProject({ manifest: manifest({ tags: ['bug'] }), original: PNG, doc, thumb: null }));
+    expect(peek.doc.annotations).toHaveLength(1);
+    expect(peek.manifest.tags).toEqual(['bug']);
+  });
+
+  it('extracts text annotations', () => {
+    const text: Annotation = { id: 't', type: 'text', x: 0, y: 0, rotation: 0, style: { stroke: '#000', strokeWidth: 0 }, data: { text: '  Login button  ', width: 100 } };
+    expect(annotationText({ ...emptyDoc(), annotations: [arrow, text] })).toBe('Login button');
+  });
+
+  it('normalizes tags', () => {
+    expect(normalizeTags([' Bug ', 'bug', 'UI  review', '', 'ui review'])).toEqual(['Bug', 'UI review']);
   });
 });

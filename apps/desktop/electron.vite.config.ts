@@ -28,6 +28,7 @@ export default defineConfig({
           overlay: resolve(__dirname, 'src/renderer/overlay/index.html'),
           editor: resolve(__dirname, 'src/renderer/editor/index.html'),
           home: resolve(__dirname, 'src/renderer/home/index.html'),
+          library: resolve(__dirname, 'src/renderer/library/index.html'),
         },
       },
     },

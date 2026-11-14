@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog, screen, type WebContents } from 'electron';
+import { app, BrowserWindow, dialog, screen, type WebContents } from 'electron';
 import { writeFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import type { AnnotationType, MagpieProject } from '@magpie/format';
@@ -20,6 +20,16 @@ interface EditorSession {
 }
 
 const sessions = new Map<number, EditorSession>();
+
+/**
+ * Quitting with editors open: each editor cancels its first close to flush an
+ * autosave, which also cancels the app quit. Remember that a quit was asked
+ * for and re-issue it as each editor finishes closing.
+ */
+let quitting = false;
+export function markQuitting(): void {
+  quitting = true;
+}
 
 export function openEditor(path: string, project: MagpieProject, startTool: StartTool = null): BrowserWindow {
   for (const s of sessions.values()) {
@@ -65,7 +75,10 @@ export function openEditor(path: string, project: MagpieProject, startTool: Star
       }
     }, 4000);
   });
-  win.on('closed', () => sessions.delete(id));
+  win.on('closed', () => {
+    sessions.delete(id);
+    if (quitting) setImmediate(() => app.quit());
+  });
   return win;
 }
 
@@ -129,4 +142,14 @@ export function editorClose(sender: WebContents): void {
 
 export function editorWindows(): BrowserWindow[] {
   return [...sessions.values()].map((s) => s.win).filter((w) => !w.isDestroyed());
+}
+
+/** Close editors on a file without saving (it is about to be trashed). */
+export function closeEditorsForPath(path: string): void {
+  for (const s of sessions.values()) {
+    if (s.path === path && !s.win.isDestroyed()) {
+      s.closeReady = true;
+      s.win.destroy();
+    }
+  }
 }

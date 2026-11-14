@@ -29,6 +29,9 @@ export function Home() {
       <header>
         <h1>Magpie</h1>
         <p className="muted">Lives in your tray. Captures autosave to your Pictures folder as editable .magpie files.</p>
+        <button className="primary library-btn" onClick={() => api.openLibrary()}>
+          Open Library
+        </button>
       </header>
 
       <section className="captures">

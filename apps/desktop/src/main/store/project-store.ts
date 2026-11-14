@@ -3,6 +3,7 @@
  * Pure format logic lives in @magpie/format; this file only does fs + naming.
  */
 import { app, nativeImage } from 'electron';
+import { EventEmitter } from 'node:events';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { release } from 'node:os';
@@ -12,14 +13,34 @@ import {
   FORMAT_ID,
   FORMAT_VERSION,
   emptyDoc,
+  normalizeTags,
   packProject,
+  peekProject,
   unpackProject,
   type AnnotationDoc,
   type DisplayInfo,
   type MagpieProject,
+  type Manifest,
 } from '@magpie/format';
 import { APP_NAME } from '../../shared/constants';
 import { settings } from '../settings';
+
+/** Emits 'written' (path) after every successful project write, so the library can re-index at once. */
+export const projectEvents = new EventEmitter();
+
+/** Serialize writes per file: the editor's autosave and a library tag edit must never interleave. */
+const locks = new Map<string, Promise<unknown>>();
+async function withFileLock<T>(path: string, fn: () => Promise<T>): Promise<T> {
+  const prev = locks.get(path) ?? Promise.resolve();
+  const run = prev.catch(() => {}).then(fn);
+  const tail = run.catch(() => {});
+  locks.set(path, tail);
+  try {
+    return await run;
+  } finally {
+    if (locks.get(path) === tail) locks.delete(path);
+  }
+}
 
 export function autosaveRoot(): string {
   return settings.get().autosaveDir ?? join(app.getPath('pictures'), APP_NAME);
@@ -45,6 +66,7 @@ async function writeAtomic(path: string, bytes: Uint8Array): Promise<void> {
   const tmp = `${path}.tmp-${process.pid}`;
   await writeFile(tmp, bytes);
   await rename(tmp, path);
+  if (path.toLowerCase().endsWith(FILE_EXTENSION)) projectEvents.emit('written', path);
 }
 
 function quickThumb(png: Buffer): Buffer {
@@ -83,7 +105,7 @@ export async function createProjectFromCapture(c: NewCapture): Promise<{ path: s
     doc: emptyDoc(),
     thumb: quickThumb(c.png),
   };
-  await writeAtomic(path, packProject(project));
+  await withFileLock(path, () => writeAtomic(path, packProject(project)));
   return { path, project };
 }
 
@@ -91,25 +113,54 @@ export async function loadProject(path: string): Promise<MagpieProject> {
   return unpackProject(await readFile(path));
 }
 
-/** Re-save annotations (and a fresh thumbnail) into an existing project. */
+/**
+ * Re-save annotations (and a fresh thumbnail) into an existing project.
+ * Title and tags are owned by the library, so take them from disk rather than
+ * from the editor's (possibly stale) copy of the manifest.
+ */
 export async function saveProject(
   path: string,
   base: MagpieProject,
   doc: AnnotationDoc,
   thumbWebp: Uint8Array | null,
 ): Promise<MagpieProject> {
-  const project: MagpieProject = {
-    manifest: {
-      ...base.manifest,
-      modified: new Date().toISOString(),
-      thumb: thumbWebp ? 'thumb.webp' : base.manifest.thumb,
-    },
-    original: base.original,
-    doc,
-    thumb: thumbWebp ?? base.thumb,
-  };
-  await writeAtomic(path, packProject(project));
-  return project;
+  return withFileLock(path, async () => {
+    let onDisk: Pick<Manifest, 'title' | 'tags'> = { title: base.manifest.title, tags: base.manifest.tags };
+    try {
+      const { manifest } = peekProject(await readFile(path));
+      onDisk = { title: manifest.title, tags: manifest.tags };
+    } catch {
+      /* file missing or unreadable: fall back to what the editor has */
+    }
+    const project: MagpieProject = {
+      manifest: {
+        ...base.manifest,
+        ...onDisk,
+        modified: new Date().toISOString(),
+        thumb: thumbWebp ? 'thumb.webp' : base.manifest.thumb,
+      },
+      original: base.original,
+      doc,
+      thumb: thumbWebp ?? base.thumb,
+    };
+    await writeAtomic(path, packProject(project));
+    return project;
+  });
+}
+
+/** Library edits (title, tags): read-modify-write the manifest under the file lock. */
+export async function updateManifest(path: string, fn: (m: Manifest) => Manifest): Promise<Manifest> {
+  return withFileLock(path, async () => {
+    const project = unpackProject(await readFile(path));
+    const next = fn(project.manifest);
+    const manifest: Manifest = {
+      ...next,
+      title: next.title?.trim() || undefined,
+      tags: next.tags ? normalizeTags(next.tags) : undefined,
+    };
+    await writeAtomic(path, packProject({ ...project, manifest }));
+    return manifest;
+  });
 }
 
 export async function writePngBeside(projectPath: string, png: Uint8Array): Promise<string> {

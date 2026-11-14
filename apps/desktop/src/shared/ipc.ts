@@ -78,6 +78,52 @@ export interface DoctorItem {
   message: string;
 }
 
+// ---- Library (Phase 2) ----------------------------------------------------
+
+export interface LibraryItem {
+  id: number;
+  path: string;
+  /** Manifest title, or the file name when none was set. */
+  title: string;
+  customTitle: boolean;
+  createdAt: string;
+  modifiedAt: string;
+  width: number;
+  height: number;
+  annotationCount: number;
+  tags: string[];
+  /** magpie-thumb:// URL, cache-busted by file mtime. */
+  thumbUrl: string | null;
+}
+
+export interface LibraryQuery {
+  text?: string;
+  /** All of these tags (AND). */
+  tags?: string[];
+  untagged?: boolean;
+  sort?: 'newest' | 'oldest';
+  limit?: number;
+  offset?: number;
+}
+
+export interface LibraryResult {
+  total: number;
+  items: LibraryItem[];
+}
+
+export interface TagCount {
+  name: string;
+  count: number;
+}
+
+export interface LibraryOverview {
+  root: string;
+  all: number;
+  untagged: number;
+  tags: TagCount[];
+  scanning: boolean;
+}
+
 export interface MagpieApi {
   platform: NodeJS.Platform;
 
@@ -101,6 +147,18 @@ export interface MagpieApi {
   suspendHotkeys(suspended: boolean): void;
   chooseFolder(): Promise<string | null>;
   runDoctor(): Promise<DoctorItem[]>;
+
+  openLibrary(): void;
+  libraryQuery(q: LibraryQuery): Promise<LibraryResult>;
+  libraryOverview(): Promise<LibraryOverview>;
+  librarySetTitle(id: number, title: string): Promise<void>;
+  libraryAddTag(ids: number[], tag: string): Promise<void>;
+  libraryRemoveTag(ids: number[], tag: string): Promise<void>;
+  libraryTrash(ids: number[]): Promise<number>;
+  libraryOpen(ids: number[]): void;
+  libraryReveal(id: number): void;
+  libraryRescan(): Promise<void>;
+  onLibraryChanged(cb: () => void): () => void;
 }
 
 /** Channel names, so main and preload can't drift. */
@@ -123,4 +181,15 @@ export const CH = {
   suspendHotkeys: 'settings:suspend-hotkeys',
   chooseFolder: 'settings:choose-folder',
   runDoctor: 'app:doctor',
+  openLibrary: 'library:open-window',
+  libraryQuery: 'library:query',
+  libraryOverview: 'library:overview',
+  librarySetTitle: 'library:set-title',
+  libraryAddTag: 'library:add-tag',
+  libraryRemoveTag: 'library:remove-tag',
+  libraryTrash: 'library:trash',
+  libraryOpen: 'library:open',
+  libraryReveal: 'library:reveal',
+  libraryRescan: 'library:rescan',
+  libraryChanged: 'library:changed',
 } as const;

@@ -6,11 +6,15 @@ import { disconnectBus } from './capture/portal-dbus';
 import { runDoctor } from './doctor';
 import { registerHotkeys, unregisterAllHotkeys } from './hotkeys';
 import { setupIpc } from './ipc';
+import { closeLibrary, initLibrary, registerLibrarySchemes } from './library/service';
 import { settings } from './settings';
 import { createTray } from './tray';
+import { markQuitting } from './windows/editor';
 import { showHome } from './windows/home';
+import { showLibrary } from './windows/library';
 
 if (process.platform === 'win32') app.setAppUserModelId(APP_ID);
+registerLibrarySchemes(); // privileged schemes must be registered before 'ready'
 
 // One resident instance; `magpie --capture region` from a GNOME custom shortcut forwards here (§5).
 if (!app.requestSingleInstanceLock()) {
@@ -21,11 +25,14 @@ if (!app.requestSingleInstanceLock()) {
     if (!handleCli(cmd)) showHome();
   });
 
+  app.on('before-quit', () => markQuitting());
+
   // Never quit when the last window closes: tray-resident (A7).
   app.on('window-all-closed', () => {});
   app.on('will-quit', () => {
     unregisterAllHotkeys();
     disconnectBus();
+    closeLibrary();
   });
 
   void app.whenReady().then(start);
@@ -40,6 +47,10 @@ function handleCli(cmd: CliCommand): boolean {
   }
   if (cmd.capture) {
     void runCapture(cmd.capture);
+    acted = true;
+  }
+  if (cmd.library) {
+    showLibrary();
     acted = true;
   }
   return acted;
@@ -58,6 +69,8 @@ async function start(): Promise<void> {
 
   setupIpc();
   createTray();
+  // Index in the background; never block startup on it.
+  initLibrary().catch((err) => console.error('[library] init failed', err));
   const hotkeys = registerHotkeys(settings.get().hotkeys, (mode) => void runCapture(mode));
 
   const acted = handleCli(cmd);

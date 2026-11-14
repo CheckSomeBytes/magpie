@@ -4,6 +4,7 @@ import trayIconPath from '../../resources/icons/tray.png?asset';
 import { openProjectDialog, runCapture } from './capture-flow';
 import { autosaveRoot } from './store/project-store';
 import { showHome } from './windows/home';
+import { showLibrary } from './windows/library';
 
 let tray: Tray | null = null;
 
@@ -17,6 +18,7 @@ export function createTray(): Tray {
     { label: 'Capture Window', click: () => void runCapture('window') },
     { label: 'Capture Full Screen', click: () => void runCapture('full') },
     { type: 'separator' },
+    { label: 'Library…', click: () => showLibrary() },
     { label: 'Open Project…', click: () => void openProjectDialog() },
     {
       label: 'Open Captures Folder',

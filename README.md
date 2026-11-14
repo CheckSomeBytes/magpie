@@ -2,7 +2,10 @@
 
 Local-first screenshot + annotation app (Snagit replacement) for **Ubuntu 26.04 / GNOME 50 (Wayland-only)** and **Windows 11**. Electron + React + Konva. No cloud, no telemetry.
 
-This is v1 of the design doc ("Snagit Alternative — Design Doc", Nov 4 2026): capture, overlay region select, editor, `.magpie` project files, tray, hotkeys.
+Built from the design doc ("Snagit Alternative — Design Doc", Nov 4 2026):
+
+- **v1:** capture, overlay region select, editor, `.magpie` project files, tray, hotkeys.
+- **Phase 2:** library with thumbnail grid, tags, full-text search and a SQLite index.
 
 ## Quick start
 
@@ -35,10 +38,11 @@ apps/desktop/
   src/main/                  tray, hotkeys, capture flow, IPC, settings, doctor, autostart
     capture/                 CaptureProvider: linux-portal (dbus-next → Screenshot portal), windows (desktopCapturer + koffi Win32), fake
     windows/                 overlay (region select), editor, home
-    store/project-store.ts   autosave to ~/Pictures/Magpie/YYYY/MM/*.magpie (atomic writes)
+    store/project-store.ts   autosave to ~/Pictures/Magpie/YYYY/MM/*.magpie (atomic, per-file locked writes)
+    library/                 db.ts (node:sqlite + FTS5 index), indexer.ts (scan/sync), service.ts (watcher, thumbs, edits)
   src/preload/               contextBridge API (sandboxed renderers)
   src/shared/                IPC contract, geometry (logical↔physical mapping), CLI, accelerators. Tested.
-  src/renderer/{overlay,editor,home}/
+  src/renderer/{overlay,editor,home,library}/
   resources/                 icons (scripts/make-icons.mjs), .desktop file
 ```
 
@@ -53,6 +57,18 @@ apps/desktop/
 - **Window capture:** on Linux it uses the portal's interactive picker (the only way to get one window on Wayland). On Windows it uses the overlay with z-ordered window snapping. Clicking a window in region mode also snaps on Windows.
 - **Known advisory:** `dbus-next` pins `xml2js@0.4` (prototype-pollution advisory). It only parses introspection XML from the local session bus. Replace it if the D-Bus layer gets swapped for an `ashpd` helper.
 
+## Library (Phase 2)
+
+Open it from the tray (**Library…**), from the home window, or with `magpie --library`.
+
+- **Files are the source of truth.** Title and tags are stored in each `.magpie` manifest. `library.sqlite` in the app's data folder is a rebuildable cache, so deleting it loses nothing.
+- **Index:** `node:sqlite` (bundled with Electron 45's Node 24, so no native module or `@electron/rebuild`). It has `captures`, `tags`, `capture_tags` and an FTS5 table over title, file name, text annotations, tags and OCR text. OCR text is reserved for Phase 4: `setOcrText` makes it searchable and it survives re-indexing.
+- **Sync:** a full scan at startup, skipping files whose modification time and size haven't changed. A recursive file watcher handles external changes, and Magpie's own saves are indexed immediately. Moving the captures folder in Settings re-points the watcher and rescans.
+- **Search:** each word is matched as a prefix, and all words must match. Tags in the sidebar filter with AND, and there's also an "Untagged" view.
+- **Edits:** renaming and tagging rewrite the manifest under a per-file lock. Editor saves re-read title and tags from disk, so the two never clobber each other. **Move to Trash** uses the system trash, after a confirmation.
+- **Thumbnails** are served from the index over `magpie-thumb://`.
+- **Keys:** Ctrl+F search, Ctrl+A select all, ←/→ move, Enter open, Delete trash, Esc clear. Ctrl/Shift-click selects several.
+
 ## Verified / not yet verified
 
 Verified in this repo: unit tests; typecheck; production build; an Electron smoke test driven over CDP (on WSLg, with the fake provider). The smoke test covered editor render of all eight annotation types, drawing, save, thumbnail, undo + autosave, crop, copy, region capture through the overlay into a cropped editor, the home window, and staying resident after windows close.
@@ -66,4 +82,6 @@ Verified in this repo: unit tests; typecheck; production build; an Electron smok
 5. Pasting clipboard images into Firefox, Slack, LibreOffice and GNOME Text Editor while Magpie sits in the tray.
 6. Windows: per-monitor overlays and koffi window bounds on mixed DPI.
 
-Phases 2–5 (library, scrolling capture, OCR, video) are not started.
+Phase 2 is verified the same way: 12 unit tests on the index and indexer, plus a 14-check Electron smoke test. That test covered the scan, thumbnails, search, tag filter, writing tags and titles to files, the watcher picking up an external delete, a new capture appearing live, and an editor save keeping library tags.
+
+Phases 3–5 (scrolling capture, OCR, video) are not started.

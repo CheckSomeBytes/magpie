@@ -1,11 +1,13 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron';
-import { CH, type CaptureMode, type OverlaySelection, type SavePayload, type Settings } from '../shared/ipc';
+import { CH, type CaptureMode, type LibraryQuery, type OverlaySelection, type SavePayload, type Settings } from '../shared/ipc';
 import { setLaunchAtLogin } from './autostart';
-import { runCapture } from './capture-flow';
+import { openProjectFile, runCapture } from './capture-flow';
 import { runDoctor } from './doctor';
 import { hotkeyStatus, registerHotkeys, suspendHotkeys } from './hotkeys';
+import * as library from './library/service';
 import { settings } from './settings';
 import { editorClose, editorCloseReady, editorCopy, editorExportPng, editorInitFor, editorSave } from './windows/editor';
+import { showLibrary } from './windows/library';
 import { overlayCancel, overlayCommit, overlayInitFor } from './windows/overlay';
 
 const MODES: CaptureMode[] = ['region', 'window', 'full'];
@@ -42,4 +44,18 @@ export function setupIpc(): void {
     return res.canceled ? null : res.filePaths[0] ?? null;
   });
   ipcMain.handle(CH.runDoctor, () => runDoctor(hotkeyStatus()));
+
+  const ids = (v: unknown): number[] => (Array.isArray(v) ? v.filter((x): x is number => Number.isInteger(x)) : []);
+  ipcMain.on(CH.openLibrary, () => showLibrary());
+  ipcMain.handle(CH.libraryQuery, (_e, q: LibraryQuery) => library.libraryQuery(q ?? {}));
+  ipcMain.handle(CH.libraryOverview, () => library.libraryOverview());
+  ipcMain.handle(CH.librarySetTitle, (_e, id: number, title: string) => library.setTitle(id, String(title ?? '')));
+  ipcMain.handle(CH.libraryAddTag, (_e, list: unknown, tag: string) => library.addTag(ids(list), String(tag ?? '')));
+  ipcMain.handle(CH.libraryRemoveTag, (_e, list: unknown, tag: string) => library.removeTag(ids(list), String(tag ?? '')));
+  ipcMain.handle(CH.libraryTrash, (e, list: unknown) => library.trash(ids(list), BrowserWindow.fromWebContents(e.sender) ?? undefined));
+  ipcMain.on(CH.libraryOpen, (_e, list: unknown) => {
+    for (const p of library.libraryPaths(ids(list).slice(0, 12))) void openProjectFile(p);
+  });
+  ipcMain.on(CH.libraryReveal, (_e, id: number) => library.reveal(id));
+  ipcMain.handle(CH.libraryRescan, () => library.rescan());
 }

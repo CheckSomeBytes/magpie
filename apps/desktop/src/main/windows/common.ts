@@ -2,7 +2,7 @@ import { BrowserWindow, type BrowserWindowConstructorOptions } from 'electron';
 import { join } from 'node:path';
 import appIcon from '../../../resources/icons/icon.png?asset';
 
-export type Page = 'overlay' | 'editor' | 'home';
+export type Page = 'overlay' | 'editor' | 'home' | 'library';
 
 export function createAppWindow(page: Page, opts: BrowserWindowConstructorOptions): BrowserWindow {
   const win = new BrowserWindow({

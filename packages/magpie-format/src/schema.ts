@@ -38,7 +38,10 @@ export interface Manifest {
   displays: DisplayInfo[];
   /** Zip entry name of the thumbnail, or null when none was written. */
   thumb: 'thumb.webp' | 'thumb.png' | null;
+  /** User-set title; when absent, readers derive one from the file name. */
   title?: string;
+  /** Library tags (Phase 2). Stored in the file so the SQLite index is a rebuildable cache. */
+  tags?: string[];
 }
 
 export interface Style {
@@ -111,6 +114,28 @@ export interface MagpieProject {
   original: Uint8Array;
   doc: AnnotationDoc;
   thumb: Uint8Array | null;
+}
+
+/** Searchable text from text annotations (for the library index). */
+export function annotationText(doc: AnnotationDoc): string {
+  return doc.annotations
+    .filter((a): a is TextAnnotation => a.type === 'text')
+    .map((a) => a.data.text.trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** Trim, collapse whitespace, drop empties and case-insensitive duplicates. */
+export function normalizeTags(tags: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of tags) {
+    const t = raw.replace(/\s+/g, ' ').trim().slice(0, 64);
+    if (!t || seen.has(t.toLowerCase())) continue;
+    seen.add(t.toLowerCase());
+    out.push(t);
+  }
+  return out;
 }
 
 export function emptyDoc(): AnnotationDoc {
