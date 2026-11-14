@@ -3,9 +3,13 @@
  * nothing is selected. Changing a selected shape also updates that tool's
  * remembered style (last-used per tool, §7).
  */
-import type { AnnotationType, Style } from '@magpie/format';
+import { useEffect, useMemo } from 'react';
+import { BUILTIN_STAMPS, type AnnotationType, type BuiltinStamp, type Style } from '@magpie/format';
+import { api } from '../shared/api';
+import { useAsk } from './Dialogs';
+import { deleteStylePreset, saveStylePreset, useStylePresets } from './presets';
 import { useEditor } from './store';
-import { PALETTE, TOOLS } from './tools';
+import { PALETTE, STAMP_ART, TOOLS } from './tools';
 
 const WIDTHS: Partial<Record<AnnotationType, [number, number]>> = {
   arrow: [2, 24],
@@ -22,6 +26,7 @@ export function Properties() {
   const blur = useEditor((s) => s.blur);
   const crop = useEditor((s) => s.crop);
   const ed = useEditor.getState;
+  const ask = useAsk();
 
   if (tool === 'crop') {
     return (
@@ -45,7 +50,17 @@ export function Properties() {
     );
   }
 
-  const type: AnnotationType | null = selected?.type ?? (tool === 'select' ? null : tool);
+  if (tool === 'ocr' && !selected) {
+    return (
+      <aside className="props">
+        <h3>Grab text</h3>
+        <p className="muted">Drag around text to read it, or click once to read the whole image. The text is copied to the clipboard. Reading runs offline on this computer.</p>
+        <p className="muted">It reads the original capture, not your annotations.</p>
+      </aside>
+    );
+  }
+
+  const type: AnnotationType | null = selected?.type ?? (tool === 'select' || tool === 'ocr' ? null : tool);
   if (!type) {
     return (
       <aside className="props">
@@ -61,7 +76,11 @@ export function Properties() {
     ed().setToolStyle(type, patch);
     if (selected) ed().update(selected.id, (a) => ({ ...a, style: { ...a.style, ...patch } }));
   };
-  const title = TOOLS.find((t) => t.id === type)?.label ?? type;
+  const title = type === 'image' ? 'Image' : TOOLS.find((t) => t.id === type)?.label ?? type;
+  const applyBlur = (patch: { mode: 'blur' | 'pixelate'; amount: number }) => {
+    ed().setBlurPrefs(patch);
+    if (selected?.type === 'blur') ed().update(selected.id, (a) => (a.type === 'blur' ? { ...a, data: { ...a.data, ...patch } } : a));
+  };
 
   return (
     <aside className="props">
@@ -70,7 +89,27 @@ export function Properties() {
         {selected ? ' (selected)' : ''}
       </h3>
 
-      {type !== 'blur' && (
+      {(type === 'stamp' || (type === 'image' && !selected)) && <StampPicker selectedStampId={selected?.type === 'stamp' ? selected.id : null} />}
+
+      {type === 'image' && selected?.type === 'image' && (
+        <section>
+          <p className="muted">Pasted or stamped image. Drag the corners to resize.</p>
+          <button
+            onClick={async () => {
+              const png = ed().assets[selected.data.asset];
+              if (!png) return;
+              const name = await ask('Save as stamp', { label: 'Stamp name', initial: 'My stamp' });
+              if (!name) return;
+              const s = await api.saveStamp(name, png);
+              ed().setCustomStamps([...ed().customStamps, s]);
+            }}
+          >
+            Save as stamp
+          </button>
+        </section>
+      )}
+
+      {type !== 'blur' && type !== 'stamp' && type !== 'image' && (
         <section>
           <label>{type === 'step' ? 'Number color' : 'Color'}</label>
           <Swatches value={style.stroke} onChange={(stroke) => stroke && setStyle({ stroke })} />
@@ -148,6 +187,8 @@ export function Properties() {
           }}
         />
       )}
+
+      {type !== 'image' && <StylePresets type={type} style={style} onApply={(p) => (p.blur ? applyBlur(p.blur) : setStyle(p.style))} />}
 
       {selected && (
         <section className="row">
@@ -230,5 +271,125 @@ function Shortcuts() {
         <kbd>Ctrl+0</kbd> Fit · <kbd>Ctrl+1</kbd> 100%
       </div>
     </div>
+  );
+}
+
+export function StampIcon({ name, size = 28 }: { name: BuiltinStamp; size?: number }) {
+  const art = STAMP_ART[name];
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden>
+      <circle cx="12" cy="12" r="11" fill={art.color} />
+      <path d={art.path} transform="translate(2.16 2.16) scale(0.82)" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" fill={art.filled ? '#fff' : 'none'} />
+    </svg>
+  );
+}
+
+function StampPicker({ selectedStampId }: { selectedStampId: string | null }) {
+  const stamp = useEditor((s) => s.stamp);
+  const custom = useEditor((s) => s.customStamps);
+  const size = useEditor((s) => s.styles.stamp.fontSize ?? 48);
+  const ed = useEditor.getState;
+  const urls = useMemo(() => Object.fromEntries(custom.map((c) => [c.id, URL.createObjectURL(new Blob([c.png as BlobPart], { type: 'image/png' }))])), [custom]);
+  useEffect(() => () => Object.values(urls).forEach(URL.revokeObjectURL), [urls]);
+
+  const pickBuiltin = (name: BuiltinStamp) => {
+    ed().setStamp({ kind: 'builtin', name });
+    if (selectedStampId) ed().update(selectedStampId, (a) => (a.type === 'stamp' ? { ...a, data: { ...a.data, stamp: name } } : a));
+  };
+
+  return (
+    <>
+      <section>
+        <label>Stamp</label>
+        <div className="stamp-grid">
+          {BUILTIN_STAMPS.map((n) => (
+            <button key={n} className={`stamp-btn ${stamp.kind === 'builtin' && stamp.name === n ? 'active' : ''}`} title={STAMP_ART[n].label} aria-label={STAMP_ART[n].label} onClick={() => pickBuiltin(n)}>
+              <StampIcon name={n} />
+            </button>
+          ))}
+          {custom.map((c) => (
+            <span key={c.id} className="stamp-custom">
+              <button className={`stamp-btn ${stamp.kind === 'custom' && stamp.id === c.id ? 'active' : ''}`} title={c.name} aria-label={c.name} onClick={() => ed().setStamp({ kind: 'custom', id: c.id })}>
+                <img src={urls[c.id]} alt="" />
+              </button>
+              <button
+                className="stamp-del"
+                title={`Delete ${c.name}`}
+                aria-label={`Delete stamp ${c.name}`}
+                onClick={async () => {
+                  await api.deleteStamp(c.id);
+                  ed().setCustomStamps(ed().customStamps.filter((x) => x.id !== c.id));
+                  if (stamp.kind === 'custom' && stamp.id === c.id) ed().setStamp({ kind: 'builtin', name: 'check' });
+                }}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+        <button
+          className="small-btn"
+          onClick={async () => {
+            const s = await api.importStamp();
+            if (!s) return;
+            ed().setCustomStamps([...ed().customStamps, s]);
+            ed().setStamp({ kind: 'custom', id: s.id });
+          }}
+        >
+          Add image as stamp…
+        </button>
+      </section>
+      <section>
+        <label>
+          Size <span className="muted">{size}px</span>
+        </label>
+        <input
+          type="range"
+          min={16}
+          max={160}
+          value={size}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            ed().setToolStyle('stamp', { fontSize: v });
+            if (selectedStampId) ed().update(selectedStampId, (a) => (a.type === 'stamp' ? { ...a, data: { ...a.data, size: v } } : a));
+          }}
+        />
+        <p className="muted">Click the image to place a stamp. Paste (Ctrl+V) to drop in any image.</p>
+      </section>
+    </>
+  );
+}
+
+function StylePresets({ type, style, onApply }: { type: AnnotationType; style: Style; onApply: (p: { style: Style; blur?: { mode: 'blur' | 'pixelate'; amount: number } }) => void }) {
+  const all = useStylePresets();
+  const blur = useEditor((s) => s.blur);
+  const ask = useAsk();
+  const mine = all.filter((p) => p.type === type);
+  return (
+    <section>
+      <label>Presets</label>
+      <div className="preset-chips">
+        {mine.map((p) => (
+          <span key={p.id} className="preset-chip">
+            <button onClick={() => onApply(p)} title={`Apply "${p.name}"`}>
+              {p.style.stroke && type !== 'blur' && type !== 'stamp' && <i style={{ background: p.style.fill ?? p.style.stroke }} />}
+              {p.name}
+            </button>
+            <button className="preset-del" aria-label={`Delete preset ${p.name}`} onClick={() => deleteStylePreset(p.id)}>
+              ×
+            </button>
+          </span>
+        ))}
+        <button
+          className="small-btn"
+          onClick={async () => {
+            const name = await ask('Save style preset', { label: 'Preset name', initial: '' });
+            if (name) saveStylePreset({ name, type, style: { ...style }, ...(type === 'blur' ? { blur: { ...blur } } : {}) });
+          }}
+        >
+          + Save current
+        </button>
+      </div>
+    </section>
   );
 }

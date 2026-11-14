@@ -3,6 +3,8 @@
  * captures folder, serves thumbnails, and applies edits back to the files.
  */
 import { app, BrowserWindow, dialog, protocol, shell } from 'electron';
+import { THUMB_SCHEME } from '../protocols';
+import { EventEmitter } from 'node:events';
 import { watch, type FSWatcher } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -14,14 +16,9 @@ import { closeEditorsForPath } from '../windows/editor';
 import { LibraryDb } from './db';
 import { isProjectFile, syncFolder, syncPaths } from './indexer';
 
-export const THUMB_SCHEME = 'magpie-thumb';
 
-/** Must run before app 'ready'. */
-export function registerLibrarySchemes(): void {
-  protocol.registerSchemesAsPrivileged([
-    { scheme: THUMB_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } },
-  ]);
-}
+/** 'indexed' fires after a scan or sync touched the index (OCR listens). */
+export const libraryEvents = new EventEmitter();
 
 let db: LibraryDb | null = null;
 let watcher: FSWatcher | null = null;
@@ -31,13 +28,13 @@ const pending = new Set<string>();
 let pendingTimer: NodeJS.Timeout | undefined;
 let changedTimer: NodeJS.Timeout | undefined;
 
-function lib(): LibraryDb {
+export function lib(): LibraryDb {
   if (!db) throw new Error('Library is not initialised');
   return db;
 }
 
 /** Tell every window (library pages listen) that results may have changed. Debounced. */
-function broadcastChanged(): void {
+export function broadcastChanged(): void {
   clearTimeout(changedTimer);
   changedTimer = setTimeout(() => {
     for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(CH.libraryChanged);
@@ -100,7 +97,10 @@ function queue(path: string): void {
     pending.clear();
     void syncPaths(lib(), paths)
       .then((r) => {
-        if (r.added || r.updated || r.removed) broadcastChanged();
+        if (r.added || r.updated || r.removed) {
+          broadcastChanged();
+          libraryEvents.emit('indexed');
+        }
       })
       .catch((err) => console.warn('[library] sync failed', err));
   }, 300);
@@ -122,6 +122,7 @@ export function rescan(): Promise<void> {
     } finally {
       scanning = null;
       broadcastChanged();
+      libraryEvents.emit('indexed');
     }
   })();
   return scanning;

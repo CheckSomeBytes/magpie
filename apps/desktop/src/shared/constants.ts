@@ -16,4 +16,6 @@ export const DEFAULT_SETTINGS: Settings = {
   copyOnCapture: false,
   exportPngOnSave: false,
   launchAtLogin: false,
+  ocrEnabled: true,
+  capturePresets: [],
 };

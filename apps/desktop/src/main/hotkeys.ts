@@ -8,20 +8,27 @@ import type { CaptureMode, HotkeyStatus, Settings } from '../shared/ipc';
 
 let status: HotkeyStatus[] = [];
 
-export function registerHotkeys(hotkeys: Settings['hotkeys'], onCapture: (mode: CaptureMode) => void): HotkeyStatus[] {
+export function registerHotkeys(
+  s: Settings,
+  onCapture: (mode: CaptureMode) => void,
+  onPreset: (id: string) => void,
+): HotkeyStatus[] {
   globalShortcut.unregisterAll();
-  status = (Object.keys(hotkeys) as CaptureMode[]).map((mode) => {
-    const accelerator = hotkeys[mode];
+  const bind = (mode: HotkeyStatus['mode'], accelerator: string, fn: () => void): HotkeyStatus => {
     if (!accelerator) return { mode, accelerator, ok: false };
     let ok = false;
     try {
-      ok = globalShortcut.register(accelerator, () => onCapture(mode));
+      ok = globalShortcut.register(accelerator, fn);
     } catch (err) {
       console.warn(`[hotkeys] ${accelerator} rejected`, err);
     }
     if (!ok) console.warn(`[hotkeys] could not register ${accelerator} for ${mode} (taken by another app or denied by the portal)`);
     return { mode, accelerator, ok };
-  });
+  };
+  status = [
+    ...(Object.keys(s.hotkeys) as CaptureMode[]).map((mode) => bind(mode, s.hotkeys[mode], () => onCapture(mode))),
+    ...s.capturePresets.filter((p) => p.hotkey).map((p) => bind(`preset:${p.id}`, p.hotkey, () => onPreset(p.id))),
+  ];
   return status;
 }
 

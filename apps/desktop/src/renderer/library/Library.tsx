@@ -257,6 +257,14 @@ type Run = (p: Promise<unknown>) => Promise<void>;
 
 function Details({ item, allTags, run }: { item: LibraryItem; allTags: string[]; run: Run }) {
   const [title, setTitle] = useState(item.customTitle ? item.title : '');
+  const [ocrText, setOcrText] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void api.libraryOcrText(item.id).then((t) => alive && setOcrText(t));
+    return () => {
+      alive = false;
+    };
+  }, [item.id, item.modifiedAt]);
   useEffect(() => setTitle(item.customTitle ? item.title : ''), [item.id, item.title, item.customTitle]);
   const commitTitle = () => {
     const current = item.customTitle ? item.title : '';
@@ -301,6 +309,17 @@ function Details({ item, allTags, run }: { item: LibraryItem; allTags: string[];
           {item.path}
         </dd>
       </dl>
+      <details className="ocr" open={!!ocrText}>
+        <summary>Text found {ocrText === null ? '(reading…)' : ocrText ? '' : '(none)'}</summary>
+        {ocrText ? (
+          <>
+            <pre>{ocrText.length > 1200 ? `${ocrText.slice(0, 1200)}…` : ocrText}</pre>
+            <button className="small" onClick={() => void api.copyText(ocrText)}>
+              Copy text
+            </button>
+          </>
+        ) : null}
+      </details>
       <div className="actions">
         <button className="primary" onClick={() => api.libraryOpen([item.id])}>
           Open in editor

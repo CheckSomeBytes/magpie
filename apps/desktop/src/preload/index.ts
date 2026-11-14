@@ -31,6 +31,17 @@ const api: MagpieApi = {
   chooseFolder: () => ipcRenderer.invoke(CH.chooseFolder),
   runDoctor: () => ipcRenderer.invoke(CH.runDoctor),
 
+  copyText: (text) => ipcRenderer.invoke(CH.copyText, text),
+  listStamps: () => ipcRenderer.invoke(CH.listStamps),
+  importStamp: () => ipcRenderer.invoke(CH.importStamp),
+  saveStamp: (name, png) => ipcRenderer.invoke(CH.saveStamp, name, png),
+  deleteStamp: (id) => ipcRenderer.invoke(CH.deleteStamp, id),
+  runPreset: (id) => ipcRenderer.send(CH.runPreset, id),
+  onOcrJob: (cb) => listen<[import('../shared/ipc').OcrJob]>(CH.ocrJob, cb),
+  ocrResult: (id, text, error) => ipcRenderer.send(CH.ocrResult, id, text, error),
+  ocrReady: () => ipcRenderer.send(CH.ocrReady),
+  libraryOcrText: (id) => ipcRenderer.invoke(CH.libraryOcrText, id),
+
   scrollInit: () => ipcRenderer.invoke(CH.scrollInit),
   scrollPhase: (phase) => ipcRenderer.invoke(CH.scrollPhase, phase),
   scrollFinish: (png) => ipcRenderer.invoke(CH.scrollFinish, png),

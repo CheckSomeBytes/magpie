@@ -271,6 +271,16 @@ export class LibraryDb {
     return { data: row.thumb, mime: row.thumb_mime ?? 'image/png' };
   }
 
+  /** Captures not yet OCR'd (newest first). '' means "done, no text found". */
+  needsOcr(limit: number): Array<{ id: number; path: string }> {
+    return this.stmt('SELECT id, path FROM captures WHERE ocr_text IS NULL ORDER BY created_at DESC LIMIT ?').all(limit) as Array<{ id: number; path: string }>;
+  }
+
+  ocrText(id: number): string | null {
+    const r = this.stmt('SELECT ocr_text FROM captures WHERE id = ?').get(id) as { ocr_text: string | null } | undefined;
+    return r?.ocr_text ?? null;
+  }
+
   /** Phase 4 hook: OCR text survives re-indexing (upsert COALESCEs it). */
   setOcrText(id: number, text: string): void {
     this.tx(() => {

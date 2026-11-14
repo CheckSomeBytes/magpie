@@ -236,3 +236,198 @@ button.danger {
   font-size: 12px;
   pointer-events: none;
 }
+
+/* ---- Phase 4: dialogs, stamps, presets, templates ---- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 20;
+  padding: 16px;
+}
+.modal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(380px, 100%);
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+.modal.wide {
+  width: min(640px, 100%);
+}
+.modal h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.modal label {
+  color: var(--muted);
+  font-size: 12px;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.ocr-text {
+  width: 100%;
+  font: 12px/1.5 ui-monospace, 'Cascadia Mono', 'Ubuntu Mono', monospace;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  resize: vertical;
+}
+.error {
+  color: var(--danger);
+}
+.spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 3s;
+  }
+}
+
+.stamp-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.stamp-btn {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 8px;
+}
+.stamp-btn.active {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.stamp-btn img {
+  max-width: 30px;
+  max-height: 30px;
+}
+.stamp-custom {
+  position: relative;
+}
+.stamp-del {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 11px;
+  line-height: 1;
+  display: none;
+}
+.stamp-custom:hover .stamp-del,
+.stamp-custom:focus-within .stamp-del {
+  display: block;
+}
+.small-btn {
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.preset-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.preset-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-2);
+}
+.preset-chip button {
+  border: none;
+  background: transparent;
+  padding: 3px 4px 3px 9px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.preset-chip i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.preset-chip .preset-del {
+  padding: 3px 8px 3px 2px;
+  color: var(--muted);
+}
+
+.menu-wrap {
+  position: relative;
+}
+.menu-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+}
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 10;
+  min-width: 240px;
+  padding: 4px;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+.menu-row {
+  display: flex;
+}
+.menu-item {
+  flex: 1;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 6px 10px;
+}
+.menu-item:hover:not(:disabled) {
+  background: var(--panel-2);
+}
+.menu-del {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+}
+.menu-empty {
+  padding: 6px 10px;
+}
+.menu-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}

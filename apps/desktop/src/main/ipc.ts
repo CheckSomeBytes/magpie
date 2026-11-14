@@ -1,11 +1,12 @@
-import { BrowserWindow, dialog, ipcMain } from 'electron';
+import { BrowserWindow, clipboard, dialog, ipcMain } from 'electron';
 import { CAPTURE_MODES, CH, type CaptureMode, type LibraryQuery, type OverlaySelection, type SavePayload, type Settings } from '../shared/ipc';
 import { setLaunchAtLogin } from './autostart';
-import { openProjectFile, runCapture } from './capture-flow';
+import { openProjectFile, runCapture, runPreset } from './capture-flow';
 import { runDoctor } from './doctor';
 import { hotkeyStatus, registerHotkeys, suspendHotkeys } from './hotkeys';
 import * as library from './library/service';
 import { settings } from './settings';
+import * as stamps from './stamps';
 import { editorClose, editorCloseReady, editorCopy, editorExportPng, editorInitFor, editorSave } from './windows/editor';
 import { showLibrary } from './windows/library';
 import { scrollCancel, scrollFinish, scrollInit, scrollPhase } from './windows/scroll';
@@ -32,7 +33,7 @@ export function setupIpc(): void {
   ipcMain.handle(CH.getSettings, () => settings.get());
   ipcMain.handle(CH.setSettings, async (_e, patch: Partial<Settings>) => {
     const next = await settings.update(patch);
-    if (patch.hotkeys) registerHotkeys(next.hotkeys, (m) => void runCapture(m));
+    if (patch.hotkeys || patch.capturePresets) registerHotkeys(next, (m) => void runCapture(m), runPreset);
     if (patch.launchAtLogin !== undefined) await setLaunchAtLogin(next.launchAtLogin);
     return { settings: next, hotkeys: hotkeyStatus() };
   });
@@ -45,6 +46,14 @@ export function setupIpc(): void {
     return res.canceled ? null : res.filePaths[0] ?? null;
   });
   ipcMain.handle(CH.runDoctor, () => runDoctor(hotkeyStatus()));
+
+  ipcMain.handle(CH.copyText, (_e, text: string) => clipboard.writeText(String(text ?? '')));
+  ipcMain.handle(CH.listStamps, () => stamps.listStamps());
+  ipcMain.handle(CH.importStamp, (e) => stamps.importStamp(BrowserWindow.fromWebContents(e.sender) ?? undefined));
+  ipcMain.handle(CH.saveStamp, (_e, name: string, png: Uint8Array) => stamps.saveStamp(String(name ?? ''), png));
+  ipcMain.handle(CH.deleteStamp, (_e, id: string) => stamps.deleteStamp(String(id)));
+  ipcMain.on(CH.runPreset, (_e, id: string) => runPreset(String(id)));
+  ipcMain.handle(CH.libraryOcrText, (_e, id: number) => library.lib().ocrText(Number(id)));
 
   ipcMain.handle(CH.scrollInit, (e) => scrollInit(e.sender));
   ipcMain.handle(CH.scrollPhase, (e, phase) => scrollPhase(e.sender, phase));

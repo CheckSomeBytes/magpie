@@ -78,6 +78,14 @@ export type BlurAnnotation = Base<
 /** Numbered callout. `number` is derived from order but stored for readers. */
 export type StepAnnotation = Base<'step', { number: number; radius: number }>;
 
+/** Built-in stamp glyphs (Phase 4). */
+export const BUILTIN_STAMPS = ['check', 'cross', 'warning', 'info', 'question', 'star'] as const;
+export type BuiltinStamp = (typeof BUILTIN_STAMPS)[number];
+export type StampAnnotation = Base<'stamp', { stamp: BuiltinStamp; size: number }>;
+
+/** Placed image (pasted, or a custom stamp). Pixels live in the project's assets/<asset>.png. */
+export type ImageAnnotation = Base<'image', { asset: string; width: number; height: number }>;
+
 export type Annotation =
   | ArrowAnnotation
   | LineAnnotation
@@ -86,7 +94,9 @@ export type Annotation =
   | TextAnnotation
   | HighlighterAnnotation
   | BlurAnnotation
-  | StepAnnotation;
+  | StepAnnotation
+  | StampAnnotation
+  | ImageAnnotation;
 
 export type AnnotationType = Annotation['type'];
 
@@ -99,6 +109,8 @@ export const ANNOTATION_TYPES: readonly AnnotationType[] = [
   'highlighter',
   'blur',
   'step',
+  'stamp',
+  'image',
 ];
 
 export interface AnnotationDoc {
@@ -114,6 +126,20 @@ export interface MagpieProject {
   original: Uint8Array;
   doc: AnnotationDoc;
   thumb: Uint8Array | null;
+  /** Embedded images referenced by image annotations: asset id → PNG bytes. */
+  assets?: Record<string, Uint8Array>;
+}
+
+export const ASSET_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** Assets actually referenced by the document (drop orphans on save). */
+export function usedAssets(doc: AnnotationDoc, assets: Record<string, Uint8Array> | undefined): Record<string, Uint8Array> {
+  const out: Record<string, Uint8Array> = {};
+  if (!assets) return out;
+  for (const a of doc.annotations) {
+    if (a.type === 'image' && assets[a.data.asset]) out[a.data.asset] = assets[a.data.asset]!;
+  }
+  return out;
 }
 
 /** Searchable text from text annotations (for the library index). */

@@ -317,3 +317,24 @@ button.danger {
     max-height: 40vh;
   }
 }
+
+.ocr summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+}
+.ocr pre {
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font: 11px/1.45 ui-monospace, 'Cascadia Mono', 'Ubuntu Mono', monospace;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  margin: 6px 0;
+}
+.ocr .small {
+  font-size: 12px;
+  padding: 3px 8px;
+}

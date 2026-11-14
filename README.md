@@ -7,6 +7,7 @@ Built from the design doc ("Snagit Alternative — Design Doc", Nov 4 2026):
 - **v1:** capture, overlay region select, editor, `.magpie` project files, tray, hotkeys.
 - **Phase 2:** library with thumbnail grid, tags, full-text search and a SQLite index.
 - **Phase 3:** scrolling capture (you scroll, Magpie samples and stitches).
+- **Phase 4:** offline OCR (Grab text + searchable library), stamps and pasted images, style presets, annotation templates, capture presets.
 
 ## Quick start
 
@@ -92,6 +93,17 @@ Start it from the tray (**Scrolling Capture**), the home window, `magpie --captu
 
 Limitations: only downward scrolling is stitched. On Wayland the portal may ask again on each capture, because Chromium doesn't expose the portal's `restore_token`. On Linux the recording panel can be captured if it overlaps the region, since GNOME doesn't let apps place windows.
 
+## OCR, stamps and presets (Phase 4)
+
+- **OCR** uses tesseract.js 7, the browser build, fully offline. `scripts/copy-ocr-assets.mjs` copies the worker, the three LSTM WASM cores and the English `best_int` model (~3 MB) into `resources/ocr`; it runs automatically before dev and build. They're served over `magpie-asset://`, a CORS-enabled custom scheme, because the OCR worker runs from a `blob:` URL. The editor and OCR pages allow this in their CSP (`'wasm-unsafe-eval'`, `magpie-asset:`).
+  - **Grab text** (G in the editor): drag around text, or click once for the whole image. It reads the original capture, not the annotations, and copies the result.
+  - **Library search:** a hidden OCR window reads each capture in the background, newest first. The text goes into the index (it's also shown in the details panel) and is searchable straight away. Turn it off in Settings with "Read text in captures…".
+- **Stamps** (M): six built-in badges (check, cross, warning, info, question, star), plus your own stamps. Add them with "Add image as stamp…" or **Save as stamp** on a pasted image. They're stored in `<userData>/stamps`.
+- **Paste** (Ctrl+V): drops any clipboard image in as an image annotation. Its pixels are embedded in the `.magpie` under `assets/`, and unused assets are dropped on save.
+- **Style presets:** a "Presets" row in the properties panel for every tool. Save the current style under a name and click a preset to apply it.
+- **Templates:** the Templates menu saves the current annotations, positioned relative to the image size, and applies them to any capture as one undo step. Image annotations aren't included.
+- **Capture presets** (Settings → Capture presets): a mode, a 0–30 s delay, auto-tags, copy to clipboard, open the editor or save quietly to the library, and an optional hotkey. Run them from the tray **Presets** menu, the home window, or `magpie --preset=<name>`.
+
 ## Verified / not yet verified
 
 Verified in this repo: unit tests; typecheck; production build; an Electron smoke test driven over CDP (on WSLg, with the fake provider). The smoke test covered editor render of all eight annotation types, drawing, save, thumbnail, undo + autosave, crop, copy, region capture through the overlay into a cropped editor, the home window, and staying resident after windows close.
@@ -108,5 +120,12 @@ Verified in this repo: unit tests; typecheck; production build; an Electron smok
 Phase 2 is verified the same way: 12 unit tests on the index and indexer, plus a 14-check Electron smoke test. That test covered the scan, thumbnails, search, tag filter, writing tags and titles to files, the watcher picking up an external delete, a new capture appearing live, and an editor save keeping library tags.
 
 Phase 3 is verified the same way: 9 stitcher unit tests (exact reconstruction, noise and chroma smear, repetitive content, gaps, reverse scrolling, nudges, height cap), plus an 11-check smoke test. In the smoke test, a fake scrolling stream (`MAGPIE_FAKE_SCROLL=tall.png`) goes through the real video → worker → stitcher → editor path, and the saved `.magpie` matches the source page pixel-for-pixel.
+
+Phase 4 is verified the same way: format tests for assets, plus a 9-check smoke test that renders a real text image in the app.
+
+- Background OCR makes "overdue" searchable, and Grab text reads both lines exactly.
+- A quiet preset saves with its auto-tag and doesn't open an editor.
+- A pasted image is embedded as an asset, and Save as stamp, a style preset and a template all work.
+- The saved file contains the expected annotation types and the asset.
 
 **Smoke tests:** `npm run build -w magpie && apps/desktop/scripts/smoke/run.sh` (needs a display).

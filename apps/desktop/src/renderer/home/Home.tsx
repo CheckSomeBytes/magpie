@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CAPTURE_MODES, CAPTURE_MODE_LABELS as MODE_LABEL, type CaptureMode, type DoctorItem, type HotkeyStatus, type Settings } from '../../shared/ipc';
+import { CAPTURE_MODES, CAPTURE_MODE_LABELS as MODE_LABEL, type CaptureMode, type CapturePreset, type DoctorItem, type HotkeyStatus, type Settings } from '../../shared/ipc';
 import { acceleratorFromEvent } from '../../shared/accelerator';
 import { api } from '../shared/api';
 
@@ -87,6 +87,10 @@ export function Home() {
           <input type="checkbox" checked={settings.launchAtLogin} onChange={(e) => void patch({ launchAtLogin: e.target.checked })} />
           Start Magpie when I log in
         </label>
+        <label className="check">
+          <input type="checkbox" checked={settings.ocrEnabled} onChange={(e) => void patch({ ocrEnabled: e.target.checked })} />
+          Read text in captures so library search finds it (offline)
+        </label>
         <div className="field">
           <span>Captures folder</span>
           <code className="path" title={settings.autosaveDir ?? ''}>
@@ -103,6 +107,8 @@ export function Home() {
           {settings.autosaveDir && <button onClick={() => void patch({ autosaveDir: null })}>Default</button>}
         </div>
       </section>
+
+      <Presets presets={settings.capturePresets} hotkeys={hotkeys} onChange={(capturePresets) => void patch({ capturePresets })} />
 
       <section className="card">
         <h2>Diagnostics</h2>
@@ -154,5 +160,76 @@ function HotkeyInput({ value, onChange }: { value: string; onChange: (acc: strin
         }
       }}
     />
+  );
+}
+
+function Presets({ presets, hotkeys, onChange }: { presets: CapturePreset[]; hotkeys: HotkeyStatus[]; onChange: (p: CapturePreset[]) => void }) {
+  const update = (id: string, patch: Partial<CapturePreset>) => onChange(presets.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  const add = () =>
+    onChange([
+      ...presets,
+      { id: crypto.randomUUID(), name: `Preset ${presets.length + 1}`, mode: 'region', delaySec: 0, copyToClipboard: true, openEditor: true, tags: [], hotkey: '' },
+    ]);
+  return (
+    <section className="card">
+      <h2>Capture presets</h2>
+      <p className="muted small" style={{ marginTop: 0, marginBottom: 10 }}>
+        Named captures with their own delay, tags and hotkey. Run them from the tray, here, or with <code>magpie --preset=&lt;name&gt;</code>.
+      </p>
+      {presets.map((p) => {
+        const st = hotkeys.find((h) => h.mode === `preset:${p.id}`);
+        return (
+          <div className="preset" key={p.id}>
+            <div className="field">
+              <span>Name</span>
+              <input value={p.name} onChange={(e) => update(p.id, { name: e.target.value })} aria-label="Preset name" />
+            </div>
+            <div className="field">
+              <span>Capture</span>
+              <select value={p.mode} onChange={(e) => update(p.id, { mode: e.target.value as CapturePreset['mode'] })} aria-label="Capture mode">
+                <option value="region">Region</option>
+                <option value="window">Window</option>
+                <option value="full">Full screen</option>
+              </select>
+              <label className="inline">
+                Delay
+                <input type="number" min={0} max={30} value={p.delaySec} onChange={(e) => update(p.id, { delaySec: Math.max(0, Math.min(30, Number(e.target.value) || 0)) })} />s
+              </label>
+            </div>
+            <div className="field">
+              <span>Tags</span>
+              <input
+                defaultValue={p.tags.join(', ')}
+                placeholder="e.g. bug, web"
+                aria-label="Tags"
+                onBlur={(e) => update(p.id, { tags: e.target.value.split(',').map((t) => t.trim()).filter(Boolean) })}
+              />
+            </div>
+            <div className="field">
+              <span>Hotkey</span>
+              <HotkeyInput value={p.hotkey} onChange={(hotkey) => update(p.id, { hotkey })} />
+              {p.hotkey && <span className={`pill ${st?.ok ? 'ok' : 'bad'}`}>{st?.ok ? 'active' : 'inactive'}</span>}
+            </div>
+            <label className="check">
+              <input type="checkbox" checked={p.copyToClipboard} onChange={(e) => update(p.id, { copyToClipboard: e.target.checked })} />
+              Copy to clipboard
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={p.openEditor} onChange={(e) => update(p.id, { openEditor: e.target.checked })} />
+              Open in the editor (otherwise save to the library quietly)
+            </label>
+            <div className="row">
+              <button className="primary" onClick={() => api.runPreset(p.id)}>
+                Run
+              </button>
+              <button className="danger" onClick={() => onChange(presets.filter((x) => x.id !== p.id))}>
+                Delete
+              </button>
+            </div>
+          </div>
+        );
+      })}
+      <button onClick={add}>Add preset</button>
+    </section>
   );
 }

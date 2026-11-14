@@ -14,6 +14,28 @@ export const CAPTURE_MODE_LABELS: Record<CaptureMode, string> = {
 };
 export type LinuxRegionMode = 'overlay' | 'editor-crop';
 
+/** Named capture profile (Phase 4): mode + delay + what to do with the result. */
+export interface CapturePreset {
+  id: string;
+  name: string;
+  mode: 'region' | 'window' | 'full';
+  delaySec: number;
+  copyToClipboard: boolean;
+  /** false = save to the library quietly (a notification confirms). */
+  openEditor: boolean;
+  tags: string[];
+  /** Optional global hotkey. */
+  hotkey: string;
+}
+
+export interface CaptureOptions {
+  delayMs?: number;
+  tags?: string[];
+  copy?: boolean;
+  openEditor?: boolean;
+  title?: string;
+}
+
 export interface Settings {
   hotkeys: Record<CaptureMode, string>;
   /** Linux only: how "region" works after the spikes decide (§4.3). */
@@ -25,10 +47,14 @@ export interface Settings {
   /** Write a flattened .png next to the .magpie on Save (Ctrl+S). */
   exportPngOnSave: boolean;
   launchAtLogin: boolean;
+  /** Read text in captures in the background so library search finds it (Phase 4). */
+  ocrEnabled: boolean;
+  capturePresets: CapturePreset[];
 }
 
 export interface HotkeyStatus {
-  mode: CaptureMode;
+  /** Capture mode, or `preset:<id>`. */
+  mode: CaptureMode | `preset:${string}`;
   accelerator: string;
   ok: boolean;
 }
@@ -71,6 +97,8 @@ export interface EditorInit {
   doc: AnnotationDoc;
   startTool: AnnotationType | 'select' | 'crop' | null;
   settings: Settings;
+  /** Embedded images (image annotations). */
+  assets: Record<string, Uint8Array>;
 }
 
 export interface SavePayload {
@@ -78,6 +106,20 @@ export interface SavePayload {
   thumbWebp: Uint8Array | null;
   /** Present on an explicit save when exportPngOnSave is set. */
   flattenedPng?: Uint8Array | null;
+  /** Embedded images; orphans are dropped on save. */
+  assets?: Record<string, Uint8Array>;
+}
+
+/** A user stamp (Phase 4), kept in the app's data folder. */
+export interface CustomStamp {
+  id: string;
+  name: string;
+  png: Uint8Array;
+}
+
+export interface OcrJob {
+  id: number;
+  png: Uint8Array;
 }
 
 export interface DoctorItem {
@@ -166,6 +208,19 @@ export interface MagpieApi {
   chooseFolder(): Promise<string | null>;
   runDoctor(): Promise<DoctorItem[]>;
 
+  copyText(text: string): Promise<void>;
+  listStamps(): Promise<CustomStamp[]>;
+  importStamp(): Promise<CustomStamp | null>;
+  saveStamp(name: string, png: Uint8Array): Promise<CustomStamp>;
+  deleteStamp(id: string): Promise<void>;
+  runPreset(id: string): void;
+
+  /** OCR worker window only. */
+  onOcrJob(cb: (job: OcrJob) => void): () => void;
+  ocrResult(id: number, text: string | null, error?: string): void;
+  ocrReady(): void;
+  libraryOcrText(id: number): Promise<string | null>;
+
   scrollInit(): Promise<ScrollInit>;
   /** Reshape the scroll window for a phase; resolves once the window has moved out of the way. */
   scrollPhase(phase: ScrollPhase): Promise<void>;
@@ -206,6 +261,16 @@ export const CH = {
   suspendHotkeys: 'settings:suspend-hotkeys',
   chooseFolder: 'settings:choose-folder',
   runDoctor: 'app:doctor',
+  copyText: 'app:copy-text',
+  listStamps: 'stamps:list',
+  importStamp: 'stamps:import',
+  saveStamp: 'stamps:save',
+  deleteStamp: 'stamps:delete',
+  runPreset: 'app:run-preset',
+  ocrJob: 'ocr:job',
+  ocrResult: 'ocr:result',
+  ocrReady: 'ocr:ready',
+  libraryOcrText: 'library:ocr-text',
   scrollInit: 'scroll:init',
   scrollPhase: 'scroll:phase',
   scrollFinish: 'scroll:finish',

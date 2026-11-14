@@ -3,7 +3,8 @@
  * annotation model (not Konva toJSON), capped at 200 (§7).
  */
 import { create } from 'zustand';
-import { renumberSteps, type Annotation, type AnnotationType, type Rect, type Style } from '@magpie/format';
+import { renumberSteps, type Annotation, type AnnotationType, type BuiltinStamp, type Rect, type Style } from '@magpie/format';
+import type { CustomStamp } from '../../shared/ipc';
 import { DEFAULT_BLUR, DEFAULT_STYLES, type BlurPrefs, type Tool } from './tools';
 
 const HISTORY_CAP = 200;
@@ -14,15 +15,18 @@ interface Snapshot {
   crop: Rect | null;
 }
 
+export type StampChoice = { kind: 'builtin'; name: BuiltinStamp } | { kind: 'custom'; id: string };
+
 interface Prefs {
   styles: Record<AnnotationType, Style>;
   blur: BlurPrefs;
+  stamp?: StampChoice;
 }
 
 function loadPrefs(): Prefs {
   try {
     const raw = JSON.parse(localStorage.getItem(PREFS_KEY) ?? 'null') as Partial<Prefs> | null;
-    if (raw) return { styles: { ...DEFAULT_STYLES, ...raw.styles }, blur: { ...DEFAULT_BLUR, ...raw.blur } };
+    if (raw) return { styles: { ...DEFAULT_STYLES, ...raw.styles }, blur: { ...DEFAULT_BLUR, ...raw.blur }, stamp: raw.stamp };
   } catch {
     /* storage unavailable */
   }
@@ -68,6 +72,16 @@ export interface EditorState extends Snapshot {
 
   setToolStyle(type: AnnotationType, patch: Partial<Style>): void;
   setBlurPrefs(patch: Partial<BlurPrefs>): void;
+
+  /** Embedded images (asset id → PNG). Not part of undo history; orphans are dropped on save. */
+  assets: Record<string, Uint8Array>;
+  addAsset(id: string, png: Uint8Array): void;
+  stamp: StampChoice;
+  setStamp(choice: StampChoice): void;
+  customStamps: CustomStamp[];
+  setCustomStamps(list: CustomStamp[]): void;
+  /** Add several annotations as one undo step (templates). */
+  addMany(list: Annotation[]): void;
 }
 
 const prefs = loadPrefs();
@@ -97,6 +111,19 @@ export const useEditor = create<EditorState>()((set, get) => {
     revision: 0,
 
     load: (s) => set({ annotations: s.annotations, crop: s.crop, past: [], future: [], selectedId: null, revision: 0 }),
+
+    assets: {},
+    addAsset: (id, png) => set({ assets: { ...get().assets, [id]: png } }),
+    stamp: prefs.stamp ?? { kind: 'builtin', name: 'check' },
+    setStamp: (stamp) => {
+      set({ stamp });
+      savePrefs({ styles: get().styles, blur: get().blur, stamp });
+    },
+    customStamps: [],
+    setCustomStamps: (customStamps) => set({ customStamps }),
+    addMany: (list) => {
+      if (list.length) commit({ annotations: renumberSteps([...get().annotations, ...list]) }, true);
+    },
     setTool: (tool) => set({ tool, editingTextId: null }),
     select: (selectedId) => set({ selectedId }),
     setEditingText: (editingTextId) => set({ editingTextId }),
@@ -160,12 +187,12 @@ export const useEditor = create<EditorState>()((set, get) => {
     setToolStyle: (type, patch) => {
       const styles = { ...get().styles, [type]: { ...get().styles[type], ...patch } };
       set({ styles });
-      savePrefs({ styles, blur: get().blur });
+      savePrefs({ styles, blur: get().blur, stamp: get().stamp });
     },
     setBlurPrefs: (patch) => {
       const blur = { ...get().blur, ...patch };
       set({ blur });
-      savePrefs({ styles: get().styles, blur });
+      savePrefs({ styles: get().styles, blur, stamp: get().stamp });
     },
   };
 });

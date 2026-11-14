@@ -27,11 +27,20 @@ export interface CanvasHandle {
 interface Props {
   bg: HTMLImageElement;
   scale: number;
+  assetImages: Record<string, HTMLImageElement>;
+  /** Grab text: a region in image pixels, or null for the whole view. */
+  onGrabText: (rect: Rect | null) => void;
 }
 
-type DrawTool = Exclude<Tool, 'select' | 'crop' | 'text' | 'step'>;
+type DrawTool = Exclude<Tool, 'select' | 'crop' | 'text' | 'step' | 'stamp' | 'ocr'>;
 
-const TRANSFORMABLE = new Set(['rect', 'ellipse', 'text', 'blur', 'step']);
+const TRANSFORMABLE = new Set(['rect', 'ellipse', 'text', 'blur', 'step', 'stamp', 'image']);
+
+/** Width/height from a PNG's IHDR (custom stamps arrive as PNG bytes). */
+function pngSize(png: Uint8Array): { width: number; height: number } {
+  const v = new DataView(png.buffer, png.byteOffset, png.byteLength);
+  return png.byteLength > 24 ? { width: v.getUint32(16), height: v.getUint32(20) } : { width: 64, height: 64 };
+}
 
 function snap45(dx: number, dy: number): [number, number] {
   const len = Math.hypot(dx, dy);
@@ -45,7 +54,7 @@ function clampRect(r: Rect, W: number, H: number): Rect {
   return { x, y, width: Math.max(1, Math.min(Math.round(r.width), W - x)), height: Math.max(1, Math.min(Math.round(r.height), H - y)) };
 }
 
-export const CanvasView = forwardRef<CanvasHandle, Props>(function CanvasView({ bg, scale: s }, ref) {
+export const CanvasView = forwardRef<CanvasHandle, Props>(function CanvasView({ bg, scale: s, assetImages, onGrabText }, ref) {
   const annotations = useEditor((st) => st.annotations);
   const crop = useEditor((st) => st.crop);
   const tool = useEditor((st) => st.tool);
@@ -187,6 +196,30 @@ export const CanvasView = forwardRef<CanvasHandle, Props>(function CanvasView({ 
         ed().setEditingText(id);
         return;
       }
+      case 'ocr':
+        drawStart.current = p;
+        setCropDraft({ x: p.x, y: p.y, width: 0, height: 0 });
+        return;
+      case 'stamp': {
+        const id = newId();
+        const choice = ed().stamp;
+        const size = styles.stamp.fontSize ?? 48;
+        if (choice.kind === 'builtin') {
+          ed().add({ id, type: 'stamp', x: p.x, y: p.y, rotation: 0, style: { ...styles.stamp }, data: { stamp: choice.name, size } });
+        } else {
+          const custom = ed().customStamps.find((c) => c.id === choice.id);
+          if (!custom) return;
+          const asset = `stamp-${custom.id}`;
+          if (!ed().assets[asset]) ed().addAsset(asset, custom.png);
+          const nat = pngSize(custom.png);
+          const k = (size * 2) / Math.max(nat.width, nat.height);
+          const w = Math.max(4, nat.width * k);
+          const h = Math.max(4, nat.height * k);
+          ed().add({ id, type: 'image', x: p.x - w / 2, y: p.y - h / 2, rotation: 0, style: { ...styles.image }, data: { asset, width: w, height: h } });
+        }
+        ed().select(id);
+        return;
+      }
       case 'step': {
         const id = newId();
         const r = styles.step.fontSize ?? 18;
@@ -206,7 +239,7 @@ export const CanvasView = forwardRef<CanvasHandle, Props>(function CanvasView({ 
     const start = drawStart.current;
     if (!start) return;
     const p = pointer();
-    if (cropping) {
+    if (cropping || tool === 'ocr') {
       setCropDraft(rectFromPoints(start.x, start.y, p.x, p.y));
       return;
     }
@@ -233,13 +266,18 @@ export const CanvasView = forwardRef<CanvasHandle, Props>(function CanvasView({ 
     const d = draftRef.current;
     setCropDraft(null);
     setDraft(null);
-    if (cd && cd.width * s >= 4 && cd.height * s >= 4) ed().setCrop(clampRect(cd, W, H));
+    const big = !!cd && cd.width * s >= 4 && cd.height * s >= 4;
+    if (ed().tool === 'ocr') {
+      onGrabText(big ? clampRect(cd!, W, H) : null);
+      return;
+    }
+    if (big) ed().setCrop(clampRect(cd!, W, H));
     if (d && draftBigEnough(d)) {
       ed().add(d);
       ed().select(d.id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [s, W, H]);
+  }, [s, W, H, onGrabText]);
 
   useEffect(() => {
     window.addEventListener('mouseup', finishGesture);
@@ -278,6 +316,10 @@ export const CanvasView = forwardRef<CanvasHandle, Props>(function CanvasView({ 
           return { ...cur, ...base, rotation: 0, data: { ...cur.data, width: Math.max(4, cur.data.width * sx), height: Math.max(4, cur.data.height * sy) } };
         case 'step':
           return { ...cur, ...base, rotation: 0, data: { ...cur.data, radius: Math.max(8, cur.data.radius * Math.max(sx, sy)) } };
+        case 'stamp':
+          return { ...cur, ...base, data: { ...cur.data, size: Math.max(12, cur.data.size * Math.max(sx, sy)) } };
+        case 'image':
+          return { ...cur, ...base, data: { ...cur.data, width: Math.max(4, cur.data.width * sx), height: Math.max(4, cur.data.height * sy) } };
         default:
           return cur;
       }
@@ -370,6 +412,10 @@ export const CanvasView = forwardRef<CanvasHandle, Props>(function CanvasView({ 
         return { enabledAnchors: ['middle-left', 'middle-right'], rotateEnabled: true, keepRatio: false };
       case 'step':
         return { enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'], rotateEnabled: false, keepRatio: true };
+      case 'stamp':
+        return { enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'], rotateEnabled: true, keepRatio: true };
+      case 'image':
+        return { enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'], rotateEnabled: true, keepRatio: true };
       case 'blur':
         return { enabledAnchors: undefined, rotateEnabled: false, keepRatio: false };
       default:
@@ -377,7 +423,7 @@ export const CanvasView = forwardRef<CanvasHandle, Props>(function CanvasView({ 
     }
   })();
 
-  const cursor = tool === 'select' ? 'default' : tool === 'text' ? 'text' : 'crosshair';
+  const cursor = tool === 'select' ? 'default' : tool === 'text' ? 'text' : tool === 'stamp' ? 'copy' : 'crosshair';
 
   return (
     <div className="canvas-wrap" style={{ width: view.width * s, height: view.height * s, cursor }}>
@@ -407,6 +453,7 @@ export const CanvasView = forwardRef<CanvasHandle, Props>(function CanvasView({ 
               onSelect={(id) => ed().select(id)}
               onDragEnd={onDragEnd}
               onDblClick={startEditText}
+              assetImages={assetImages}
             />
           ))}
           {draft && <AnnotationNode a={draft} bg={bg} interactive={false} register={() => {}} onSelect={() => {}} onDragEnd={() => {}} />}
@@ -457,6 +504,19 @@ export const CanvasView = forwardRef<CanvasHandle, Props>(function CanvasView({ 
                 />
               ))}
             </>
+          )}
+          {tool === 'ocr' && cropDraft && (
+            <KRect
+              x={cropDraft.x}
+              y={cropDraft.y}
+              width={cropDraft.width}
+              height={cropDraft.height}
+              stroke="#4c8dff"
+              strokeWidth={1.5 / s}
+              dash={[6 / s, 4 / s]}
+              fill="rgba(76,141,255,0.12)"
+              listening={false}
+            />
           )}
           {cropping && (
             <>

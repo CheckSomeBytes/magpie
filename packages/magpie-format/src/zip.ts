@@ -1,10 +1,11 @@
 import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from 'fflate';
 import { FormatError, migrate } from './migrate';
-import type { MagpieProject } from './schema';
+import { ASSET_ID, type MagpieProject } from './schema';
 
 const MANIFEST = 'manifest.json';
 const ORIGINAL = 'original.png';
 const ANNOTATIONS = 'annotations.json';
+const ASSETS = 'assets/';
 
 /** Serialize a project to .magpie (zip) bytes. */
 export function packProject(project: MagpieProject): Uint8Array {
@@ -16,6 +17,10 @@ export function packProject(project: MagpieProject): Uint8Array {
     [ANNOTATIONS]: strToU8(JSON.stringify(project.doc)),
   };
   if (project.thumb && manifest.thumb) files[manifest.thumb] = [project.thumb, { level: 0 }];
+  for (const [id, png] of Object.entries(project.assets ?? {})) {
+    if (!ASSET_ID.test(id)) throw new FormatError(`Invalid asset id: ${id}`);
+    files[`${ASSETS}${id}.png`] = [png, { level: 0 }];
+  }
   return zipSync(files, { level: 6 });
 }
 
@@ -43,7 +48,12 @@ export function unpackProject(bytes: Uint8Array): MagpieProject {
 
   const { manifest, doc } = migrate(parse(MANIFEST), parse(ANNOTATIONS));
   const thumb = manifest.thumb ? entries[manifest.thumb] ?? null : null;
-  return { manifest, doc, original: need(ORIGINAL), thumb };
+  const assets: Record<string, Uint8Array> = {};
+  for (const [name, bytes] of Object.entries(entries)) {
+    const m = name.startsWith(ASSETS) && name.endsWith('.png') ? name.slice(ASSETS.length, -4) : null;
+    if (m && ASSET_ID.test(m)) assets[m] = bytes;
+  }
+  return { manifest, doc, original: need(ORIGINAL), thumb, assets };
 }
 
 /** Read everything except the original PNG (for the library index). */

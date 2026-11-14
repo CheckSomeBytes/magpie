@@ -97,6 +97,7 @@ export function editorInitFor(sender: WebContents): EditorInit {
     doc: s.project.doc,
     startTool: s.startTool,
     settings: settings.get(),
+    assets: s.project.assets ?? {},
   };
 }
 
@@ -104,7 +105,7 @@ export async function editorSave(sender: WebContents, payload: SavePayload): Pro
   const s = sessionFor(sender);
   // Serialize saves per window so an autosave never races an explicit save.
   const run = s.saving.then(async () => {
-    s.project = await saveProject(s.path, s.project, payload.doc, payload.thumbWebp);
+    s.project = await saveProject(s.path, s.project, payload.doc, payload.thumbWebp, payload.assets);
     if (payload.flattenedPng) await writePngBeside(s.path, payload.flattenedPng);
   });
   s.saving = run.catch(() => {});

@@ -5,7 +5,8 @@
  */
 import { useEffect, useRef } from 'react';
 import Konva from 'konva';
-import { Arrow, Circle, Ellipse, Group, Image as KImage, Line, Rect, Text } from 'react-konva';
+import { Arrow, Circle, Ellipse, Group, Image as KImage, Line, Path, Rect, Text } from 'react-konva';
+import { STAMP_ART } from './tools';
 import type { Annotation, BlurAnnotation } from '@magpie/format';
 
 export interface ShapeProps {
@@ -17,6 +18,8 @@ export interface ShapeProps {
   onSelect: (id: string) => void;
   onDragEnd: (id: string, x: number, y: number) => void;
   onDblClick?: (id: string) => void;
+  /** Decoded image assets for image annotations. */
+  assetImages?: Record<string, HTMLImageElement>;
 }
 
 export function AnnotationNode(props: ShapeProps) {
@@ -118,6 +121,34 @@ export function AnnotationNode(props: ShapeProps) {
       );
     case 'blur':
       return <BlurNode {...props} a={a} common={common} />;
+    case 'stamp': {
+      const art = STAMP_ART[a.data.stamp] ?? STAMP_ART.check;
+      const size = a.data.size;
+      const k = (size * 0.82) / 24;
+      return (
+        <Group {...common}>
+          <Circle radius={size / 2} fill={art.color} stroke="#ffffff" strokeWidth={Math.max(1.5, size / 24)} shadowColor="#000" shadowOpacity={0.25} shadowBlur={4} shadowOffsetY={1} />
+          <Path
+            data={art.path}
+            x={-12 * k}
+            y={-12 * k}
+            scaleX={k}
+            scaleY={k}
+            stroke="#ffffff"
+            strokeWidth={2.6}
+            lineCap="round"
+            lineJoin="round"
+            fill={art.filled ? '#ffffff' : undefined}
+            listening={false}
+          />
+        </Group>
+      );
+    }
+    case 'image': {
+      const img = props.assetImages?.[a.data.asset];
+      if (!img) return <Rect {...common} width={a.data.width} height={a.data.height} stroke="#999" dash={[6, 4]} strokeWidth={1} />;
+      return <KImage {...common} image={img} width={a.data.width} height={a.data.height} />;
+    }
     case 'step': {
       const r = a.data.radius;
       return (

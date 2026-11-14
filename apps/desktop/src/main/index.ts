@@ -1,13 +1,15 @@
 import { app, dialog } from 'electron';
 import { parseCli, type CliCommand } from '../shared/cli';
 import { APP_ID } from '../shared/constants';
-import { openProjectFile, runCapture } from './capture-flow';
+import { openProjectFile, runCapture, runPreset } from './capture-flow';
 import { disconnectBus } from './capture/portal-dbus';
 import { runDoctor } from './doctor';
 import { registerHotkeys, unregisterAllHotkeys } from './hotkeys';
 import { enablePipeWireCapture, setupDisplayMedia } from './capture/display-media';
 import { setupIpc } from './ipc';
-import { closeLibrary, initLibrary, registerLibrarySchemes } from './library/service';
+import { initOcr } from './library/ocr';
+import { closeLibrary, initLibrary } from './library/service';
+import { registerAssetProtocol, registerPrivilegedSchemes } from './protocols';
 import { settings } from './settings';
 import { createTray } from './tray';
 import { markQuitting } from './windows/editor';
@@ -15,7 +17,7 @@ import { showHome } from './windows/home';
 import { showLibrary } from './windows/library';
 
 if (process.platform === 'win32') app.setAppUserModelId(APP_ID);
-registerLibrarySchemes(); // privileged schemes must be registered before 'ready'
+registerPrivilegedSchemes(); // must run before 'ready'
 enablePipeWireCapture();
 
 // One resident instance; `magpie --capture region` from a GNOME custom shortcut forwards here (§5).
@@ -51,6 +53,10 @@ function handleCli(cmd: CliCommand): boolean {
     void runCapture(cmd.capture);
     acted = true;
   }
+  if (cmd.preset) {
+    runPreset(cmd.preset);
+    acted = true;
+  }
   if (cmd.library) {
     showLibrary();
     acted = true;
@@ -71,10 +77,12 @@ async function start(): Promise<void> {
 
   setupIpc();
   setupDisplayMedia();
+  registerAssetProtocol();
   createTray();
   // Index in the background; never block startup on it.
+  initOcr();
   initLibrary().catch((err) => console.error('[library] init failed', err));
-  const hotkeys = registerHotkeys(settings.get().hotkeys, (mode) => void runCapture(mode));
+  const hotkeys = registerHotkeys(settings.get(), (mode) => void runCapture(mode), runPreset);
 
   const acted = handleCli(cmd);
   if (!acted && !process.argv.includes('--hidden')) showHome();

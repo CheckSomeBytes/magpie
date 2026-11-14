@@ -6,3 +6,4 @@ release/
 .vite/
 coverage/
 apps/desktop/scripts/dev-launch.sh
+apps/desktop/resources/ocr/

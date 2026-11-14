@@ -17,6 +17,7 @@ import {
   packProject,
   peekProject,
   unpackProject,
+  usedAssets,
   type AnnotationDoc,
   type DisplayInfo,
   type MagpieProject,
@@ -82,6 +83,8 @@ export interface NewCapture {
   displays: DisplayInfo[];
   source: 'portal' | 'desktopCapturer' | 'import';
   capturedAt: string;
+  tags?: string[];
+  title?: string;
 }
 
 /** Every capture is autosaved as a .magpie immediately (§8). */
@@ -100,6 +103,8 @@ export async function createProjectFromCapture(c: NewCapture): Promise<{ path: s
       source: c.source,
       displays: c.displays,
       thumb: 'thumb.png',
+      ...(c.tags?.length ? { tags: normalizeTags(c.tags) } : {}),
+      ...(c.title?.trim() ? { title: c.title.trim() } : {}),
     },
     original: c.png,
     doc: emptyDoc(),
@@ -123,6 +128,7 @@ export async function saveProject(
   base: MagpieProject,
   doc: AnnotationDoc,
   thumbWebp: Uint8Array | null,
+  assets?: Record<string, Uint8Array>,
 ): Promise<MagpieProject> {
   return withFileLock(path, async () => {
     let onDisk: Pick<Manifest, 'title' | 'tags'> = { title: base.manifest.title, tags: base.manifest.tags };
@@ -142,6 +148,7 @@ export async function saveProject(
       original: base.original,
       doc,
       thumb: thumbWebp ?? base.thumb,
+      assets: usedAssets(doc, assets ?? base.assets),
     };
     await writeAtomic(path, packProject(project));
     return project;

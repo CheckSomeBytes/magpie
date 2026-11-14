@@ -4,6 +4,7 @@ import {
   FORMAT_VERSION,
   annotationText,
   normalizeTags,
+  usedAssets,
   FormatError,
   emptyDoc,
   migrate,
@@ -164,5 +165,21 @@ describe('library helpers', () => {
 
   it('normalizes tags', () => {
     expect(normalizeTags([' Bug ', 'bug', 'UI  review', '', 'ui review'])).toEqual(['Bug', 'UI review']);
+  });
+});
+
+describe('assets', () => {
+  it('round-trips embedded images and drops orphans via usedAssets', () => {
+    const img: Annotation = { id: 'i', type: 'image', x: 1, y: 2, rotation: 0, style: { stroke: '#000', strokeWidth: 0 }, data: { asset: 'logo_1', width: 10, height: 10 } };
+    const doc = { ...emptyDoc(), annotations: [img] };
+    const assets = usedAssets(doc, { logo_1: PNG, orphan: PNG });
+    expect(Object.keys(assets)).toEqual(['logo_1']);
+    const back = unpackProject(packProject({ manifest: manifest(), original: PNG, doc, thumb: null, assets }));
+    expect(Object.keys(back.assets ?? {})).toEqual(['logo_1']);
+    expect(back.doc.annotations[0]!.type).toBe('image');
+  });
+
+  it('rejects unsafe asset ids', () => {
+    expect(() => packProject({ manifest: manifest(), original: PNG, doc: emptyDoc(), thumb: null, assets: { '../x': PNG } })).toThrow(/Invalid asset id/);
   });
 });

@@ -30,6 +30,7 @@ export default defineConfig({
           home: resolve(__dirname, 'src/renderer/home/index.html'),
           library: resolve(__dirname, 'src/renderer/library/index.html'),
           scroll: resolve(__dirname, 'src/renderer/scroll/index.html'),
+          ocr: resolve(__dirname, 'src/renderer/ocr/index.html'),
         },
       },
     },

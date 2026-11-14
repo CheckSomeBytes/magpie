@@ -2,10 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' blob: data:"
-    />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob: magpie-asset:; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: magpie-thumb:; connect-src 'self' blob: data: magpie-asset:; worker-src 'self' blob:" />
     <title>Magpie editor</title>
   </head>
   <body>
