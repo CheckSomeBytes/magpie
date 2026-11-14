@@ -15,6 +15,7 @@ files:
 asarUnpack:
   - resources/**
   - '**/node_modules/koffi/**'
+  - '**/node_modules/ffmpeg-static/**'
 extraResources:
   - from: resources/icons
     to: icons

@@ -14,7 +14,8 @@ import { settings } from '../settings';
 import { autosaveRoot, projectEvents, updateManifest } from '../store/project-store';
 import { closeEditorsForPath } from '../windows/editor';
 import { LibraryDb } from './db';
-import { isProjectFile, syncFolder, syncPaths } from './indexer';
+import { isVideoFile, readMeta, sidecarPath, writeMeta } from '../media/sidecar';
+import { libraryPathFor, syncFolder, syncPaths } from './indexer';
 
 
 /** 'indexed' fires after a scan or sync touched the index (OCR listens). */
@@ -80,7 +81,8 @@ async function startWatching(): Promise<void> {
   try {
     // Recursive watching is supported on Linux (Node ≥ 20) and Windows.
     watcher = watch(root, { recursive: true }, (_event, name) => {
-      if (name && isProjectFile(String(name).split(/[\\/]/).pop() ?? '')) queue(join(root, String(name)));
+      const target = name ? libraryPathFor(join(root, String(name))) : null;
+      if (target) queue(target);
     });
     watcher.on('error', (err) => console.warn('[library] watcher error', err));
   } catch (err) {
@@ -145,6 +147,13 @@ async function editEach(ids: number[], fn: (tags: string[], title: string | unde
   const errors: string[] = [];
   for (const path of lib().pathsFor(ids)) {
     try {
+      if (isVideoFile(path)) {
+        // Videos keep title/tags in a "<video>.json" sidecar.
+        const meta = await readMeta(path);
+        await writeMeta(path, { ...meta, ...fn(meta.tags ?? [], meta.title) });
+        queue(path);
+        continue;
+      }
       await updateManifest(path, (m) => ({ ...m, ...fn(m.tags ?? [], m.title) }));
     } catch (err) {
       errors.push(`${path}: ${(err as Error).message}`);
@@ -189,6 +198,7 @@ export async function trash(ids: number[], parent?: BrowserWindow): Promise<numb
     try {
       await shell.trashItem(p);
       done.push(p);
+      if (isVideoFile(p)) await shell.trashItem(sidecarPath(p)).catch(() => {});
     } catch (err) {
       console.warn('[library] trash failed', p, err);
     }

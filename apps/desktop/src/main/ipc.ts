@@ -9,7 +9,10 @@ import { settings } from './settings';
 import * as stamps from './stamps';
 import { editorClose, editorCloseReady, editorCopy, editorExportPng, editorInitFor, editorSave } from './windows/editor';
 import { showLibrary } from './windows/library';
+import { recordCancel, recordChunk, recordFinish, recordInit, recordStart } from './windows/record';
 import { scrollCancel, scrollFinish, scrollInit, scrollPhase } from './windows/scroll';
+import { openVideo, videoExport, videoInit, videoReveal, videoTrash } from './windows/video';
+import { isVideoFile } from './media/sidecar';
 import { overlayCancel, overlayCommit, overlayInitFor } from './windows/overlay';
 
 const MODES: readonly CaptureMode[] = CAPTURE_MODES;
@@ -55,6 +58,16 @@ export function setupIpc(): void {
   ipcMain.on(CH.runPreset, (_e, id: string) => runPreset(String(id)));
   ipcMain.handle(CH.libraryOcrText, (_e, id: number) => library.lib().ocrText(Number(id)));
 
+  ipcMain.handle(CH.recordInit, (e) => recordInit(e.sender));
+  ipcMain.handle(CH.recordStart, (e) => recordStart(e.sender));
+  ipcMain.handle(CH.recordChunk, (e, bytes: Uint8Array) => recordChunk(e.sender, bytes));
+  ipcMain.handle(CH.recordFinish, (e) => recordFinish(e.sender));
+  ipcMain.on(CH.recordCancel, (e) => recordCancel(e.sender));
+  ipcMain.handle(CH.videoInit, (e) => videoInit(e.sender));
+  ipcMain.handle(CH.videoExport, (e, opts) => videoExport(e.sender, opts));
+  ipcMain.on(CH.videoReveal, (e, path?: string) => videoReveal(e.sender, typeof path === 'string' ? path : undefined));
+  ipcMain.handle(CH.videoTrash, (e) => videoTrash(e.sender));
+
   ipcMain.handle(CH.scrollInit, (e) => scrollInit(e.sender));
   ipcMain.handle(CH.scrollPhase, (e, phase) => scrollPhase(e.sender, phase));
   ipcMain.handle(CH.scrollFinish, (e, png: Uint8Array) => scrollFinish(e.sender, png));
@@ -69,7 +82,10 @@ export function setupIpc(): void {
   ipcMain.handle(CH.libraryRemoveTag, (_e, list: unknown, tag: string) => library.removeTag(ids(list), String(tag ?? '')));
   ipcMain.handle(CH.libraryTrash, (e, list: unknown) => library.trash(ids(list), BrowserWindow.fromWebContents(e.sender) ?? undefined));
   ipcMain.on(CH.libraryOpen, (_e, list: unknown) => {
-    for (const p of library.libraryPaths(ids(list).slice(0, 12))) void openProjectFile(p);
+    for (const p of library.libraryPaths(ids(list).slice(0, 12))) {
+      if (isVideoFile(p)) openVideo(p);
+      else void openProjectFile(p);
+    }
   });
   ipcMain.on(CH.libraryReveal, (_e, id: number) => library.reveal(id));
   ipcMain.handle(CH.libraryRescan, () => library.rescan());

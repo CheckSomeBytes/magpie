@@ -8,6 +8,7 @@ Built from the design doc ("Snagit Alternative — Design Doc", Nov 4 2026):
 - **Phase 2:** library with thumbnail grid, tags, full-text search and a SQLite index.
 - **Phase 3:** scrolling capture (you scroll, Magpie samples and stitches).
 - **Phase 4:** offline OCR (Grab text + searchable library), stamps and pasted images, style presets, annotation templates, capture presets.
+- **Phase 5:** screen recording with trim and MP4/GIF export.
 
 ## Quick start
 
@@ -104,6 +105,20 @@ Limitations: only downward scrolling is stitched. On Wayland the portal may ask 
 - **Templates:** the Templates menu saves the current annotations, positioned relative to the image size, and applies them to any capture as one undo step. Image annotations aren't included.
 - **Capture presets** (Settings → Capture presets): a mode, a 0–30 s delay, auto-tags, copy to clipboard, open the editor or save quietly to the library, and an optional hotkey. Run them from the tray **Presets** menu, the home window, or `magpie --preset=<name>`.
 
+## Video (Phase 5)
+
+Start and stop recording from the tray (**Record Video**), the home window, `magpie --capture=video`, or **Ctrl+Alt+PrintScreen**.
+
+- **Capture** uses `getDisplayMedia` through the same handler as scrolling capture. On Wayland you get one portal dialog; on Windows and X11 it records the monitor under the cursor. You can add the **microphone** (Settings) and, on Windows, **system audio** (loopback). When both are on, they're mixed into one track.
+- **Recording:** MediaRecorder (VP9 + Opus) writes 1-second chunks straight to `….webm.part` on disk, so long recordings never sit in memory. A small panel shows the timer, Pause/Resume, Stop and Discard; on Windows it's kept out of the recording.
+- **On stop**, the file is **remuxed** with ffmpeg (stream copy). MediaRecorder WebM has no duration or cues, so without this it couldn't be seeked. Then it opens for review.
+- **Review window:**
+  - The player is served over `magpie-media://`, which supports HTTP Range so you can seek. It only serves files Magpie registered.
+  - Trim with the sliders, or **I** / **O** at the playhead, and use **Play selection** to check it.
+  - **Export MP4** (H.264/AAC, faststart), **Export GIF** (palette-optimised; width and fps options), or **Save trimmed WebM** (frame-accurate). Exports go next to the source and never overwrite.
+- **Library:** `.webm` and `.mp4` files show up with a thumbnail, a ▶ duration and format badge, and the same rename and tag editing. Videos have no manifest, so title and tags live in a `<video>.json` sidecar. OCR skips videos.
+- **ffmpeg** comes from `ffmpeg-static` 5.3 (ffmpeg 7, GPL build, about 80 MB per platform). It's unpacked from the asar in packaged builds. It downloads the binary for the platform you install on, so **build each platform's package on that platform**. Doctor reports if it's missing.
+
 ## Verified / not yet verified
 
 Verified in this repo: unit tests; typecheck; production build; an Electron smoke test driven over CDP (on WSLg, with the fake provider). The smoke test covered editor render of all eight annotation types, drawing, save, thumbnail, undo + autosave, crop, copy, region capture through the overlay into a cropped editor, the home window, and staying resident after windows close.
@@ -116,6 +131,8 @@ Verified in this repo: unit tests; typecheck; production build; an Electron smok
 4. GlobalShortcuts consent dialog and persistence with the installed dev `.desktop`.
 5. Pasting clipboard images into Firefox, Slack, LibreOffice and GNOME Text Editor while Magpie sits in the tray.
 6. Windows: per-monitor overlays and koffi window bounds on mixed DPI.
+7. Screen-share path (scrolling capture and video): on Wayland, check the synthetic source opens exactly one ScreenCast portal dialog. On Windows, check system-audio loopback and that the panel is excluded from capture.
+8. Microphone permission prompts on each OS.
 
 Phase 2 is verified the same way: 12 unit tests on the index and indexer, plus a 14-check Electron smoke test. That test covered the scan, thumbnails, search, tag filter, writing tags and titles to files, the watcher picking up an external delete, a new capture appearing live, and an editor save keeping library tags.
 
@@ -128,4 +145,10 @@ Phase 4 is verified the same way: format tests for assets, plus a 9-check smoke 
 - A pasted image is embedded as an asset, and Save as stamp, a style preset and a template all work.
 - The saved file contains the expected annotation types and the asset.
 
-**Smoke tests:** `npm run build -w magpie && apps/desktop/scripts/smoke/run.sh` (needs a display).
+Phase 5 is verified with 8 unit tests that run real ffmpeg (probe, thumbnail, remux, trim-accurate MP4/GIF/WebM exports, video indexing with sidecars, v1 → v2 index migration), plus a 13-check smoke test. It records a synthetic stream through the real MediaRecorder path, using the hotkey path to start and stop, then checks:
+
+- the remuxed file has a real duration and the player can seek
+- the I/O trim gives a 1.5 s MP4, and the GIF export is valid
+- videos appear in the library, and tagging writes the sidecar
+
+**Smoke tests:** `npm run build -w magpie && apps/desktop/scripts/smoke/run.sh` (needs a display). Fakes: `MAGPIE_FAKE_CAPTURE`, `MAGPIE_FAKE_SCROLL`, `MAGPIE_FAKE_VIDEO`, all unpackaged builds only.

@@ -12,6 +12,7 @@ import { autosaveRoot, createProjectFromCapture, loadProject } from './store/pro
 import { openEditor } from './windows/editor';
 import { hideHomeForCapture } from './windows/home';
 import { isOverlayOpen, openOverlay } from './windows/overlay';
+import { startRecording } from './windows/record';
 import { startScrollSession } from './windows/scroll';
 
 let busy = false;
@@ -37,6 +38,12 @@ export function runPreset(idOrName: string): void {
 }
 
 export async function runCapture(mode: CaptureMode, opts: CaptureOptions = {}): Promise<void> {
+  if (mode === 'video') {
+    // Hotkey again (or the panel's Stop) ends the recording.
+    hideHomeForCapture();
+    startRecording();
+    return;
+  }
   if (mode === 'scroll') {
     // Its own session window; pressing the hotkey again finishes recording.
     hideHomeForCapture();

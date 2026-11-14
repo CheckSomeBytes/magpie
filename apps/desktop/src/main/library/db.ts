@@ -9,7 +9,7 @@ import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { basename } from 'node:path';
 import type { LibraryItem, LibraryQuery, LibraryResult, TagCount } from '../../shared/ipc';
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 export interface CaptureRecord {
   path: string;
@@ -27,6 +27,9 @@ export interface CaptureRecord {
   fileSize: number;
   thumb: Uint8Array | null;
   thumbMime: string | null;
+  kind?: 'image' | 'video';
+  /** Seconds, for videos. */
+  duration?: number | null;
 }
 
 interface Row {
@@ -41,6 +44,8 @@ interface Row {
   file_mtime: number;
   has_thumb: number;
   tags: string | null;
+  kind: 'image' | 'video';
+  duration: number | null;
 }
 
 const SEP = '\u001f';
@@ -79,6 +84,20 @@ export class LibraryDb {
   private migrate(): void {
     const { user_version: v } = this.db.prepare('PRAGMA user_version').get() as { user_version: number };
     if (v >= SCHEMA_VERSION) return;
+    if (v < 1) this.createV1();
+    if (v < 2) {
+      // Phase 5: videos in the library.
+      this.db.exec(`
+        BEGIN;
+        ALTER TABLE captures ADD COLUMN kind TEXT NOT NULL DEFAULT 'image';
+        ALTER TABLE captures ADD COLUMN duration REAL;
+        PRAGMA user_version = 2;
+        COMMIT;
+      `);
+    }
+  }
+
+  private createV1(): void {
     this.db.exec(`
       BEGIN;
       CREATE TABLE IF NOT EXISTS captures (
@@ -113,7 +132,7 @@ export class LibraryDb {
       CREATE VIRTUAL TABLE IF NOT EXISTS captures_fts USING fts5(
         title, body, tags, tokenize = 'unicode61 remove_diacritics 2'
       );
-      PRAGMA user_version = ${SCHEMA_VERSION};
+      PRAGMA user_version = 1;
       COMMIT;
     `);
   }
@@ -144,15 +163,16 @@ export class LibraryDb {
     return this.tx(() => {
       this.stmt(`
         INSERT INTO captures (path, title, created_at, modified_at, width, height, app_hint, ocr_text,
-          annotation_count, annotation_text, file_mtime, file_size, thumb, thumb_mime, indexed_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          annotation_count, annotation_text, file_mtime, file_size, thumb, thumb_mime, indexed_at, kind, duration)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(path) DO UPDATE SET
           title = excluded.title, created_at = excluded.created_at, modified_at = excluded.modified_at,
           width = excluded.width, height = excluded.height, app_hint = excluded.app_hint,
           ocr_text = COALESCE(excluded.ocr_text, captures.ocr_text),
           annotation_count = excluded.annotation_count, annotation_text = excluded.annotation_text,
           file_mtime = excluded.file_mtime, file_size = excluded.file_size,
-          thumb = excluded.thumb, thumb_mime = excluded.thumb_mime, indexed_at = excluded.indexed_at
+          thumb = excluded.thumb, thumb_mime = excluded.thumb_mime, indexed_at = excluded.indexed_at,
+          kind = excluded.kind, duration = excluded.duration
       `).run(
         rec.path,
         rec.title,
@@ -169,6 +189,8 @@ export class LibraryDb {
         rec.thumb,
         rec.thumbMime,
         new Date().toISOString(),
+        rec.kind ?? 'image',
+        rec.duration ?? null,
       );
       const { id } = this.stmt('SELECT id FROM captures WHERE path = ?').get(rec.path) as { id: number };
 
@@ -226,7 +248,7 @@ export class LibraryDb {
     const rows = this.db
       .prepare(
         `SELECT c.id, c.path, c.title, c.created_at, c.modified_at, c.width, c.height, c.annotation_count, c.file_mtime,
-                c.thumb IS NOT NULL AS has_thumb,
+                c.thumb IS NOT NULL AS has_thumb, c.kind, c.duration,
                 (SELECT group_concat(t.name, '${SEP}') FROM capture_tags ct JOIN tags t ON t.id = ct.tag_id WHERE ct.capture_id = c.id) AS tags
          FROM captures c ${whereSql} ORDER BY ${order} LIMIT ? OFFSET ?`,
       )
@@ -238,7 +260,7 @@ export class LibraryDb {
     const row = this.db
       .prepare(
         `SELECT c.id, c.path, c.title, c.created_at, c.modified_at, c.width, c.height, c.annotation_count, c.file_mtime,
-                c.thumb IS NOT NULL AS has_thumb,
+                c.thumb IS NOT NULL AS has_thumb, c.kind, c.duration,
                 (SELECT group_concat(t.name, '${SEP}') FROM capture_tags ct JOIN tags t ON t.id = ct.tag_id WHERE ct.capture_id = c.id) AS tags
          FROM captures c WHERE c.id = ?`,
       )
@@ -273,7 +295,7 @@ export class LibraryDb {
 
   /** Captures not yet OCR'd (newest first). '' means "done, no text found". */
   needsOcr(limit: number): Array<{ id: number; path: string }> {
-    return this.stmt('SELECT id, path FROM captures WHERE ocr_text IS NULL ORDER BY created_at DESC LIMIT ?').all(limit) as Array<{ id: number; path: string }>;
+    return this.stmt("SELECT id, path FROM captures WHERE ocr_text IS NULL AND kind = 'image' ORDER BY created_at DESC LIMIT ?").all(limit) as Array<{ id: number; path: string }>;
   }
 
   ocrText(id: number): string | null {
@@ -316,5 +338,7 @@ function toItem(r: Row): LibraryItem {
     annotationCount: r.annotation_count,
     tags: r.tags ? r.tags.split(SEP).sort((a, b) => a.localeCompare(b)) : [],
     thumbUrl: r.has_thumb ? `magpie-thumb://t/${r.id}?v=${Math.round(r.file_mtime)}` : null,
+    kind: r.kind ?? 'image',
+    duration: r.duration ?? null,
   };
 }

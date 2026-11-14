@@ -8,6 +8,7 @@
  * Windows / X11: pick the display under the cursor (no dialog).
  */
 import { app, desktopCapturer, screen, session, type DesktopCapturerSource, type Display } from 'electron';
+import { settings } from '../settings';
 
 let lastDisplay: Display | null = null;
 
@@ -27,7 +28,7 @@ export function enablePipeWireCapture(): void {
 
 export function setupDisplayMedia(): void {
   session.defaultSession.setDisplayMediaRequestHandler(
-    async (_request, callback) => {
+    async (request, callback) => {
       try {
         if (isWayland()) {
           lastDisplay = null;
@@ -48,7 +49,9 @@ export function setupDisplayMedia(): void {
           return;
         }
         lastDisplay = display;
-        callback({ video: source });
+        // Windows can capture system audio ("loopback") alongside the screen.
+        const loopback = process.platform === 'win32' && request.audioRequested && settings.get().recordSystemAudio;
+        callback(loopback ? { video: source, audio: 'loopback' } : { video: source });
       } catch (err) {
         console.error('[display-media] failed', err);
         callback({});

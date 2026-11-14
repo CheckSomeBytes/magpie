@@ -215,7 +215,14 @@ export function Library() {
                   onDoubleClick={() => api.libraryOpen([item.id])}
                   title={item.path}
                 >
-                  <div className="thumb">{item.thumbUrl ? <img src={item.thumbUrl} alt="" loading="lazy" draggable={false} /> : <span className="muted">no preview</span>}</div>
+                  <div className="thumb">
+                    {item.thumbUrl ? <img src={item.thumbUrl} alt="" loading="lazy" draggable={false} /> : <span className="muted">no preview</span>}
+                    {item.kind === 'video' && (
+                      <span className="badge">
+                        ▶ {fmtDuration(item.duration)} · {item.path.split('.').pop()?.toUpperCase()}
+                      </span>
+                    )}
+                  </div>
                   <div className="card-title">{item.title}</div>
                   <div className="card-meta muted">
                     {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {item.width}×{item.height}
@@ -254,6 +261,12 @@ export function Library() {
 }
 
 type Run = (p: Promise<unknown>) => Promise<void>;
+
+function fmtDuration(sec: number | null): string {
+  if (sec === null || !Number.isFinite(sec)) return '–:––';
+  const s = Math.round(sec);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
 
 function Details({ item, allTags, run }: { item: LibraryItem; allTags: string[]; run: Run }) {
   const [title, setTitle] = useState(item.customTitle ? item.title : '');
@@ -302,13 +315,23 @@ function Details({ item, allTags, run }: { item: LibraryItem; allTags: string[];
         <dd>{new Date(item.createdAt).toLocaleString()}</dd>
         <dt>Edited</dt>
         <dd>{new Date(item.modifiedAt).toLocaleString()}</dd>
-        <dt>Annotations</dt>
-        <dd>{item.annotationCount}</dd>
+        {item.kind === 'video' ? (
+          <>
+            <dt>Duration</dt>
+            <dd>{fmtDuration(item.duration)}</dd>
+          </>
+        ) : (
+          <>
+            <dt>Annotations</dt>
+            <dd>{item.annotationCount}</dd>
+          </>
+        )}
         <dt>File</dt>
         <dd className="path" title={item.path}>
           {item.path}
         </dd>
       </dl>
+      {item.kind === 'image' && (
       <details className="ocr" open={!!ocrText}>
         <summary>Text found {ocrText === null ? '(reading…)' : ocrText ? '' : '(none)'}</summary>
         {ocrText ? (
@@ -320,9 +343,10 @@ function Details({ item, allTags, run }: { item: LibraryItem; allTags: string[];
           </>
         ) : null}
       </details>
+      )}
       <div className="actions">
         <button className="primary" onClick={() => api.libraryOpen([item.id])}>
-          Open in editor
+          {item.kind === 'video' ? 'Open' : 'Open in editor'}
         </button>
         <button onClick={() => api.libraryReveal(item.id)}>Show in folder</button>
         <button className="danger" onClick={() => void run(api.libraryTrash([item.id]))}>

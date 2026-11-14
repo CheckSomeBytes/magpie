@@ -88,6 +88,16 @@ export function Home() {
           Start Magpie when I log in
         </label>
         <label className="check">
+          <input type="checkbox" checked={settings.recordMic} onChange={(e) => void patch({ recordMic: e.target.checked })} />
+          Record my microphone in videos
+        </label>
+        {api.platform === 'win32' && (
+          <label className="check">
+            <input type="checkbox" checked={settings.recordSystemAudio} onChange={(e) => void patch({ recordSystemAudio: e.target.checked })} />
+            Record system audio in videos
+          </label>
+        )}
+        <label className="check">
           <input type="checkbox" checked={settings.ocrEnabled} onChange={(e) => void patch({ ocrEnabled: e.target.checked })} />
           Read text in captures so library search finds it (offline)
         </label>

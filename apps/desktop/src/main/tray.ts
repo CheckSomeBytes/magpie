@@ -32,6 +32,7 @@ export function createTray(): Tray {
       { label: 'Capture Window', click: () => void runCapture('window') },
       { label: 'Capture Full Screen', click: () => void runCapture('full') },
       { label: 'Scrolling Capture', click: () => void runCapture('scroll') },
+      { label: 'Record Video (start/stop)', click: () => void runCapture('video') },
       ...(presets.length
         ? [{ label: 'Presets', submenu: presets.map((p) => ({ label: p.name, click: () => runPreset(p.id) })) }]
         : []),

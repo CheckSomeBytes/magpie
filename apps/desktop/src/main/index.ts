@@ -9,7 +9,7 @@ import { enablePipeWireCapture, setupDisplayMedia } from './capture/display-medi
 import { setupIpc } from './ipc';
 import { initOcr } from './library/ocr';
 import { closeLibrary, initLibrary } from './library/service';
-import { registerAssetProtocol, registerPrivilegedSchemes } from './protocols';
+import { registerAssetProtocol, registerMediaProtocol, registerPrivilegedSchemes } from './protocols';
 import { settings } from './settings';
 import { createTray } from './tray';
 import { markQuitting } from './windows/editor';
@@ -78,6 +78,7 @@ async function start(): Promise<void> {
   setupIpc();
   setupDisplayMedia();
   registerAssetProtocol();
+  registerMediaProtocol();
   createTray();
   // Index in the background; never block startup on it.
   initOcr();

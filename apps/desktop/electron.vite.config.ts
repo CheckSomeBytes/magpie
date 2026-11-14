@@ -31,6 +31,8 @@ export default defineConfig({
           library: resolve(__dirname, 'src/renderer/library/index.html'),
           scroll: resolve(__dirname, 'src/renderer/scroll/index.html'),
           ocr: resolve(__dirname, 'src/renderer/ocr/index.html'),
+          record: resolve(__dirname, 'src/renderer/record/index.html'),
+          video: resolve(__dirname, 'src/renderer/video/index.html'),
         },
       },
     },

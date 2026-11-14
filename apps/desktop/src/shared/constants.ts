@@ -10,6 +10,7 @@ export const DEFAULT_SETTINGS: Settings = {
     window: 'Shift+PrintScreen',
     full: 'Control+PrintScreen',
     scroll: 'Control+Shift+PrintScreen',
+    video: 'Control+Alt+PrintScreen',
   },
   linuxRegionMode: 'overlay',
   autosaveDir: null,
@@ -18,4 +19,6 @@ export const DEFAULT_SETTINGS: Settings = {
   launchAtLogin: false,
   ocrEnabled: true,
   capturePresets: [],
+  recordMic: false,
+  recordSystemAudio: false,
 };

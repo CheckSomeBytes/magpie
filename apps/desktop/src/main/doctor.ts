@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { APP_ID } from '../shared/constants';
 import type { DoctorItem, HotkeyStatus } from '../shared/ipc';
 import { PORTAL_IFACES, portalHasInterface, portalInterfaceVersion } from './capture/portal-dbus';
+import { ffmpegPath } from './media/ffmpeg';
 
 export function desktopFileCandidates(): string[] {
   const file = `${APP_ID}.desktop`;
@@ -52,6 +53,9 @@ export async function runDoctor(hotkeys: HotkeyStatus[]): Promise<DoctorItem[]> 
     if (await portalHasInterface(PORTAL_IFACES.globalShortcuts)) ok('GlobalShortcuts portal available');
     else warn('GlobalShortcuts portal not found (needs GNOME 48+). Use a GNOME custom shortcut running "magpie --capture=region".');
   }
+
+  if (ffmpegPath()) ok('ffmpeg available (video export, thumbnails)');
+  else warn('ffmpeg is missing, so video export (MP4/GIF/trim) and video thumbnails are off. Reinstall Magpie.');
 
   for (const h of hotkeys) {
     if (h.ok) ok(`Hotkey ${h.accelerator} → ${h.mode}`);

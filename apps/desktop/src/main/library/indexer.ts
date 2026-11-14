@@ -3,8 +3,10 @@
  * Files are re-read only when mtime or size changed.
  */
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { annotationText, normalizeTags, peekProject } from '@magpie/format';
+import { probe, thumbnail } from '../media/ffmpeg';
+import { isVideoFile, readMeta, videoForSidecar, videoStamp } from '../media/sidecar';
 import type { CaptureRecord, LibraryDb } from './db';
 
 export interface FileStamp {
@@ -15,6 +17,18 @@ export interface FileStamp {
 
 export function isProjectFile(name: string): boolean {
   return name.toLowerCase().endsWith('.magpie') && !name.startsWith('.');
+}
+
+/** Anything the library shows: projects and recorded/exported videos. */
+export function isLibraryFile(name: string): boolean {
+  return !name.startsWith('.') && (isProjectFile(name) || isVideoFile(name));
+}
+
+/** Map a watcher event path to the library file it concerns (video sidecars → their video). */
+export function libraryPathFor(file: string): string | null {
+  const name = basename(file);
+  if (isLibraryFile(name)) return file;
+  return videoForSidecar(file);
 }
 
 /** Recursively list .magpie files (skips dot-dirs and our .tmp- files). */
@@ -31,10 +45,10 @@ export async function listProjects(root: string): Promise<FileStamp[]> {
       if (e.name.startsWith('.')) continue;
       const p = join(dir, e.name);
       if (e.isDirectory()) await walk(p);
-      else if (e.isFile() && isProjectFile(e.name)) {
+      else if (e.isFile() && isLibraryFile(e.name)) {
         try {
-          const s = await stat(p);
-          out.push({ path: p, mtime: s.mtimeMs, size: s.size });
+          const s = isVideoFile(e.name) ? await videoStamp(p) : await stat(p).then((x) => ({ mtime: x.mtimeMs, size: x.size }));
+          out.push({ path: p, ...s });
         } catch {
           /* vanished */
         }
@@ -45,7 +59,38 @@ export async function listProjects(root: string): Promise<FileStamp[]> {
   return out;
 }
 
+async function readVideoRecord(file: FileStamp): Promise<CaptureRecord> {
+  const [info, meta, st] = await Promise.all([probe(file.path), readMeta(file.path), stat(file.path)]);
+  let thumb: Uint8Array | null = null;
+  try {
+    thumb = new Uint8Array(await thumbnail(file.path, Math.min(1, (info.duration || 1) / 3)));
+  } catch {
+    /* no frame: card shows a placeholder */
+  }
+  const created = new Date(st.birthtimeMs || st.mtimeMs).toISOString();
+  return {
+    path: file.path,
+    title: meta.title ?? null,
+    createdAt: created,
+    modifiedAt: new Date(file.mtime).toISOString(),
+    width: info.width,
+    height: info.height,
+    appHint: null,
+    ocrText: null,
+    annotationCount: 0,
+    annotationText: '',
+    tags: meta.tags ?? [],
+    fileMtime: file.mtime,
+    fileSize: file.size,
+    thumb,
+    thumbMime: thumb ? 'image/png' : null,
+    kind: 'video',
+    duration: Number.isFinite(info.duration) ? info.duration : null,
+  };
+}
+
 export async function readRecord(file: FileStamp): Promise<CaptureRecord> {
+  if (isVideoFile(file.path)) return readVideoRecord(file);
   const { manifest, doc, thumb } = peekProject(await readFile(file.path));
   return {
     path: file.path,
@@ -104,18 +149,23 @@ export async function syncPaths(db: LibraryDb, paths: Iterable<string>): Promise
   const res: ScanResult = { added: 0, updated: 0, removed: 0, failed: [] };
   const known = db.fileStamps();
   const gone: string[] = [];
-  for (const path of paths) {
-    let s;
+  const targets = new Set<string>();
+  for (const p of paths) {
+    const t = libraryPathFor(p);
+    if (t) targets.add(t);
+  }
+  for (const path of targets) {
+    let s: { mtime: number; size: number };
     try {
-      s = await stat(path);
+      s = isVideoFile(path) ? await videoStamp(path) : await stat(path).then((x) => ({ mtime: x.mtimeMs, size: x.size }));
     } catch {
       gone.push(path);
       continue;
     }
     const k = known.get(path);
-    if (k && Math.abs(k.mtime - s.mtimeMs) < 1 && k.size === s.size) continue;
+    if (k && Math.abs(k.mtime - s.mtime) < 1 && k.size === s.size) continue;
     try {
-      db.upsert(await readRecord({ path, mtime: s.mtimeMs, size: s.size }));
+      db.upsert(await readRecord({ path, ...s }));
       if (k) res.updated++;
       else res.added++;
     } catch (err) {

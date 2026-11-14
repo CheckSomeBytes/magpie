@@ -51,13 +51,13 @@ function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
 
-/** ~/Pictures/Magpie/YYYY/MM/Magpie 2026-11-13 15.04.05.magpie (unique). */
-async function newProjectPath(at: Date): Promise<string> {
+/** ~/Pictures/Magpie/YYYY/MM/Magpie 2026-11-13 15.04.05<ext> (unique). */
+export async function newCapturePath(at: Date, ext: string): Promise<string> {
   const dir = join(autosaveRoot(), String(at.getFullYear()), pad(at.getMonth() + 1));
   await mkdir(dir, { recursive: true });
   const stamp = `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}.${pad(at.getMinutes())}.${pad(at.getSeconds())}`;
-  let path = join(dir, `${APP_NAME} ${stamp}${FILE_EXTENSION}`);
-  for (let i = 2; existsSync(path); i++) path = join(dir, `${APP_NAME} ${stamp} (${i})${FILE_EXTENSION}`);
+  let path = join(dir, `${APP_NAME} ${stamp}${ext}`);
+  for (let i = 2; existsSync(path); i++) path = join(dir, `${APP_NAME} ${stamp} (${i})${ext}`);
   return path;
 }
 
@@ -90,7 +90,7 @@ export interface NewCapture {
 /** Every capture is autosaved as a .magpie immediately (§8). */
 export async function createProjectFromCapture(c: NewCapture): Promise<{ path: string; project: MagpieProject }> {
   const at = new Date(c.capturedAt);
-  const path = await newProjectPath(at);
+  const path = await newCapturePath(at, FILE_EXTENSION);
   const project: MagpieProject = {
     manifest: {
       format: FORMAT_ID,

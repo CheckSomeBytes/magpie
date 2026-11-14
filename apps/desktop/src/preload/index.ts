@@ -42,6 +42,18 @@ const api: MagpieApi = {
   ocrReady: () => ipcRenderer.send(CH.ocrReady),
   libraryOcrText: (id) => ipcRenderer.invoke(CH.libraryOcrText, id),
 
+  recordInit: () => ipcRenderer.invoke(CH.recordInit),
+  recordStart: () => ipcRenderer.invoke(CH.recordStart),
+  recordChunk: (bytes) => ipcRenderer.invoke(CH.recordChunk, bytes),
+  recordFinish: () => ipcRenderer.invoke(CH.recordFinish),
+  recordCancel: () => ipcRenderer.send(CH.recordCancel),
+  onRecordStop: (cb) => listen<[]>(CH.recordStop, cb),
+  videoInit: () => ipcRenderer.invoke(CH.videoInit),
+  videoExport: (opts) => ipcRenderer.invoke(CH.videoExport, opts),
+  onVideoProgress: (cb) => listen<[number]>(CH.videoProgress, cb),
+  videoReveal: (path) => ipcRenderer.send(CH.videoReveal, path),
+  videoTrash: () => ipcRenderer.invoke(CH.videoTrash),
+
   scrollInit: () => ipcRenderer.invoke(CH.scrollInit),
   scrollPhase: (phase) => ipcRenderer.invoke(CH.scrollPhase, phase),
   scrollFinish: (png) => ipcRenderer.invoke(CH.scrollFinish, png),

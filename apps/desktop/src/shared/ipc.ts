@@ -4,13 +4,14 @@
  */
 import type { AnnotationDoc, AnnotationType, DisplayInfo, Manifest, Rect } from '@magpie/format';
 
-export const CAPTURE_MODES = ['region', 'window', 'full', 'scroll'] as const;
+export const CAPTURE_MODES = ['region', 'window', 'full', 'scroll', 'video'] as const;
 export type CaptureMode = (typeof CAPTURE_MODES)[number];
 export const CAPTURE_MODE_LABELS: Record<CaptureMode, string> = {
   region: 'Region',
   window: 'Window',
   full: 'Full screen',
   scroll: 'Scrolling',
+  video: 'Video',
 };
 export type LinuxRegionMode = 'overlay' | 'editor-crop';
 
@@ -50,6 +51,10 @@ export interface Settings {
   /** Read text in captures in the background so library search finds it (Phase 4). */
   ocrEnabled: boolean;
   capturePresets: CapturePreset[];
+  /** Video (Phase 5): record the microphone too. */
+  recordMic: boolean;
+  /** Video (Phase 5, Windows only): record system audio (loopback). */
+  recordSystemAudio: boolean;
 }
 
 export interface HotkeyStatus {
@@ -138,6 +143,36 @@ export interface ScrollInit {
   stopHotkey: string;
 }
 
+// ---- Video (Phase 5) -------------------------------------------------------
+
+export interface RecordInit {
+  /** Dev only (MAGPIE_FAKE_VIDEO): record a synthetic animated stream instead of the screen. */
+  fake: boolean;
+  mic: boolean;
+  systemAudio: boolean;
+  stopHotkey: string;
+}
+
+export interface VideoInit {
+  path: string;
+  name: string;
+  /** magpie-media:// URL with Range support (seekable). */
+  url: string;
+  duration: number;
+  width: number;
+  height: number;
+  hasAudio: boolean;
+}
+
+export interface VideoExport {
+  kind: 'mp4' | 'gif' | 'webm';
+  start: number;
+  end: number;
+  /** GIF only. */
+  gifWidth?: number;
+  gifFps?: number;
+}
+
 // ---- Library (Phase 2) ----------------------------------------------------
 
 export interface LibraryItem {
@@ -154,6 +189,9 @@ export interface LibraryItem {
   tags: string[];
   /** magpie-thumb:// URL, cache-busted by file mtime. */
   thumbUrl: string | null;
+  kind: 'image' | 'video';
+  /** Seconds, for videos. */
+  duration: number | null;
 }
 
 export interface LibraryQuery {
@@ -221,6 +259,19 @@ export interface MagpieApi {
   ocrReady(): void;
   libraryOcrText(id: number): Promise<string | null>;
 
+  recordInit(): Promise<RecordInit>;
+  recordStart(): Promise<void>;
+  recordChunk(bytes: Uint8Array): Promise<void>;
+  recordFinish(): Promise<void>;
+  recordCancel(): void;
+  onRecordStop(cb: () => void): () => void;
+
+  videoInit(): Promise<VideoInit>;
+  videoExport(opts: VideoExport): Promise<string>;
+  onVideoProgress(cb: (fraction: number) => void): () => void;
+  videoReveal(path?: string): void;
+  videoTrash(): Promise<boolean>;
+
   scrollInit(): Promise<ScrollInit>;
   /** Reshape the scroll window for a phase; resolves once the window has moved out of the way. */
   scrollPhase(phase: ScrollPhase): Promise<void>;
@@ -271,6 +322,17 @@ export const CH = {
   ocrResult: 'ocr:result',
   ocrReady: 'ocr:ready',
   libraryOcrText: 'library:ocr-text',
+  recordInit: 'record:init',
+  recordStart: 'record:start',
+  recordChunk: 'record:chunk',
+  recordFinish: 'record:finish',
+  recordCancel: 'record:cancel',
+  recordStop: 'record:stop',
+  videoInit: 'video:init',
+  videoExport: 'video:export',
+  videoProgress: 'video:progress',
+  videoReveal: 'video:reveal',
+  videoTrash: 'video:trash',
   scrollInit: 'scroll:init',
   scrollPhase: 'scroll:phase',
   scrollFinish: 'scroll:finish',
