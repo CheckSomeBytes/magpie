@@ -5,6 +5,7 @@ import { openProjectFile, runCapture } from './capture-flow';
 import { disconnectBus } from './capture/portal-dbus';
 import { runDoctor } from './doctor';
 import { registerHotkeys, unregisterAllHotkeys } from './hotkeys';
+import { enablePipeWireCapture, setupDisplayMedia } from './capture/display-media';
 import { setupIpc } from './ipc';
 import { closeLibrary, initLibrary, registerLibrarySchemes } from './library/service';
 import { settings } from './settings';
@@ -15,6 +16,7 @@ import { showLibrary } from './windows/library';
 
 if (process.platform === 'win32') app.setAppUserModelId(APP_ID);
 registerLibrarySchemes(); // privileged schemes must be registered before 'ready'
+enablePipeWireCapture();
 
 // One resident instance; `magpie --capture region` from a GNOME custom shortcut forwards here (§5).
 if (!app.requestSingleInstanceLock()) {
@@ -68,6 +70,7 @@ async function start(): Promise<void> {
   }
 
   setupIpc();
+  setupDisplayMedia();
   createTray();
   // Index in the background; never block startup on it.
   initLibrary().catch((err) => console.error('[library] init failed', err));

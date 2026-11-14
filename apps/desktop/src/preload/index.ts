@@ -31,6 +31,12 @@ const api: MagpieApi = {
   chooseFolder: () => ipcRenderer.invoke(CH.chooseFolder),
   runDoctor: () => ipcRenderer.invoke(CH.runDoctor),
 
+  scrollInit: () => ipcRenderer.invoke(CH.scrollInit),
+  scrollPhase: (phase) => ipcRenderer.invoke(CH.scrollPhase, phase),
+  scrollFinish: (png) => ipcRenderer.invoke(CH.scrollFinish, png),
+  scrollCancel: () => ipcRenderer.send(CH.scrollCancel),
+  onScrollStop: (cb) => listen<[]>(CH.scrollStop, cb),
+
   openLibrary: () => ipcRenderer.send(CH.openLibrary),
   libraryQuery: (q) => ipcRenderer.invoke(CH.libraryQuery, q),
   libraryOverview: () => ipcRenderer.invoke(CH.libraryOverview),

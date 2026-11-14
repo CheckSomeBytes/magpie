@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import type { CaptureMode, DoctorItem, HotkeyStatus, Settings } from '../../shared/ipc';
+import { CAPTURE_MODES, CAPTURE_MODE_LABELS as MODE_LABEL, type CaptureMode, type DoctorItem, type HotkeyStatus, type Settings } from '../../shared/ipc';
 import { acceleratorFromEvent } from '../../shared/accelerator';
 import { api } from '../shared/api';
 
-const MODE_LABEL: Record<CaptureMode, string> = { region: 'Region', window: 'Window', full: 'Full screen' };
 
 export function Home() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -35,7 +34,7 @@ export function Home() {
       </header>
 
       <section className="captures">
-        {(['region', 'window', 'full'] as CaptureMode[]).map((m) => (
+        {CAPTURE_MODES.map((m: CaptureMode) => (
           <button key={m} className="capture" onClick={() => api.capture(m)}>
             <span className="big">{MODE_LABEL[m]}</span>
             <kbd>{settings.hotkeys[m] || 'no hotkey'}</kbd>
@@ -45,7 +44,7 @@ export function Home() {
 
       <section className="card">
         <h2>Hotkeys</h2>
-        {(['region', 'window', 'full'] as CaptureMode[]).map((m) => {
+        {CAPTURE_MODES.map((m: CaptureMode) => {
           const st = hotkeys.find((h) => h.mode === m);
           return (
             <div className="field" key={m}>

@@ -1,0 +1,16 @@
+{
+  "name": "@magpie/stitcher",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Scrolling-capture frame stitcher: row signatures, offset voting, header/footer masking, seams.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

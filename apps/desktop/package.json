@@ -22,7 +22,8 @@
   "dependencies": {
     "@magpie/format": "*",
     "dbus-next": "^0.10.2",
-    "koffi": "^3.3.8"
+    "koffi": "^3.3.8",
+    "@magpie/stitcher": "*"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

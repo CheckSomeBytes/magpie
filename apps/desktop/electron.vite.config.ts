@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 
 // @magpie/format is a workspace package shipped as TypeScript source, so bundle it
 // instead of externalizing it like ordinary node_modules dependencies.
-const bundleWorkspace = { exclude: ['@magpie/format'] };
+const bundleWorkspace = { exclude: ['@magpie/format', '@magpie/stitcher'] };
 
 export default defineConfig({
   main: {
@@ -29,6 +29,7 @@ export default defineConfig({
           editor: resolve(__dirname, 'src/renderer/editor/index.html'),
           home: resolve(__dirname, 'src/renderer/home/index.html'),
           library: resolve(__dirname, 'src/renderer/library/index.html'),
+          scroll: resolve(__dirname, 'src/renderer/scroll/index.html'),
         },
       },
     },

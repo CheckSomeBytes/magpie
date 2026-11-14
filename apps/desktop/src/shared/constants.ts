@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS: Settings = {
     region: 'PrintScreen',
     window: 'Shift+PrintScreen',
     full: 'Control+PrintScreen',
+    scroll: 'Control+Shift+PrintScreen',
   },
   linuxRegionMode: 'overlay',
   autosaveDir: null,

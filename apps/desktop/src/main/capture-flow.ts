@@ -11,6 +11,7 @@ import { autosaveRoot, createProjectFromCapture, loadProject } from './store/pro
 import { openEditor } from './windows/editor';
 import { hideHomeForCapture } from './windows/home';
 import { isOverlayOpen, openOverlay } from './windows/overlay';
+import { startScrollSession } from './windows/scroll';
 
 let busy = false;
 
@@ -22,6 +23,12 @@ export function notify(title: string, body: string): void {
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function runCapture(mode: CaptureMode): Promise<void> {
+  if (mode === 'scroll') {
+    // Its own session window; pressing the hotkey again finishes recording.
+    hideHomeForCapture();
+    startScrollSession();
+    return;
+  }
   if (busy || isOverlayOpen()) return;
   busy = true;
   const t0 = performance.now();

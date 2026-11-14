@@ -6,6 +6,7 @@ Built from the design doc ("Snagit Alternative — Design Doc", Nov 4 2026):
 
 - **v1:** capture, overlay region select, editor, `.magpie` project files, tray, hotkeys.
 - **Phase 2:** library with thumbnail grid, tags, full-text search and a SQLite index.
+- **Phase 3:** scrolling capture (you scroll, Magpie samples and stitches).
 
 ## Quick start
 
@@ -34,6 +35,7 @@ Diagnostics: tray → *Settings & Diagnostics… → Run checks*, or `electron a
 
 ```
 packages/magpie-format/      .magpie schema, zip read/write (fflate), migrations, step renumbering. Pure TS, tested.
+packages/stitcher/           scrolling-capture stitcher (row signatures, offset voting, header/footer masking, seams). Pure TS, tested.
 apps/desktop/
   src/main/                  tray, hotkeys, capture flow, IPC, settings, doctor, autostart
     capture/                 CaptureProvider: linux-portal (dbus-next → Screenshot portal), windows (desktopCapturer + koffi Win32), fake
@@ -42,7 +44,8 @@ apps/desktop/
     library/                 db.ts (node:sqlite + FTS5 index), indexer.ts (scan/sync), service.ts (watcher, thumbs, edits)
   src/preload/               contextBridge API (sandboxed renderers)
   src/shared/                IPC contract, geometry (logical↔physical mapping), CLI, accelerators. Tested.
-  src/renderer/{overlay,editor,home,library}/
+  src/renderer/{overlay,editor,home,library,scroll}/
+  scripts/smoke/             end-to-end CDP smoke tests with fake capture sources (run.sh)
   resources/                 icons (scripts/make-icons.mjs), .desktop file
 ```
 
@@ -69,6 +72,26 @@ Open it from the tray (**Library…**), from the home window, or with `magpie --
 - **Thumbnails** are served from the index over `magpie-thumb://`.
 - **Keys:** Ctrl+F search, Ctrl+A select all, ←/→ move, Enter open, Delete trash, Esc clear. Ctrl/Shift-click selects several.
 
+## Scrolling capture (Phase 3)
+
+Start it from the tray (**Scrolling Capture**), the home window, `magpie --capture=scroll`, or **Ctrl+Shift+PrintScreen**.
+
+1. **Choose a screen.** On Wayland this is one ScreenCast portal dialog: Magpie hands Chromium a synthetic source, so it never calls `getSources()` first, which would cause a second dialog (§12). On Windows and X11 it uses the monitor under the cursor, with no dialog.
+2. **Drag around the area that scrolls** on a frozen frame. Enter alone uses the whole screen.
+3. **Scroll down slowly.** A small panel shows the stitched height. On Windows it's excluded from capture with `setContentProtection`. Press **Finish** or the hotkey again.
+4. **Review:** seams are marked, with weak or lost-track seams highlighted. Nudge any seam by ±1 or ±10 px, then **Open in editor** to get a normal `.magpie`.
+
+`@magpie/stitcher` summarises each row as 48 column blocks of luma mean plus horizontal gradient. That signature survives the video-colour conversion of screen-share frames, where exact pixel hashes don't.
+
+- Offsets are found by voting over informative rows. Flat background rows never vote.
+- Each sample is compared with the previous sample, not the last kept frame, so repetitive content can't alias.
+- Sticky headers and footers are detected and masked.
+- Seams go at the most similar row.
+- Memory stays bounded: a frame is kept about every 40% of the region height.
+- Scrolling up is ignored. Scrolling faster than one region per sample is flagged as a gap. Output is capped at 32,000 px.
+
+Limitations: only downward scrolling is stitched. On Wayland the portal may ask again on each capture, because Chromium doesn't expose the portal's `restore_token`. On Linux the recording panel can be captured if it overlaps the region, since GNOME doesn't let apps place windows.
+
 ## Verified / not yet verified
 
 Verified in this repo: unit tests; typecheck; production build; an Electron smoke test driven over CDP (on WSLg, with the fake provider). The smoke test covered editor render of all eight annotation types, drawing, save, thumbnail, undo + autosave, crop, copy, region capture through the overlay into a cropped editor, the home window, and staying resident after windows close.
@@ -84,4 +107,6 @@ Verified in this repo: unit tests; typecheck; production build; an Electron smok
 
 Phase 2 is verified the same way: 12 unit tests on the index and indexer, plus a 14-check Electron smoke test. That test covered the scan, thumbnails, search, tag filter, writing tags and titles to files, the watcher picking up an external delete, a new capture appearing live, and an editor save keeping library tags.
 
-Phases 3–5 (scrolling capture, OCR, video) are not started.
+Phase 3 is verified the same way: 9 stitcher unit tests (exact reconstruction, noise and chroma smear, repetitive content, gaps, reverse scrolling, nudges, height cap), plus an 11-check smoke test. In the smoke test, a fake scrolling stream (`MAGPIE_FAKE_SCROLL=tall.png`) goes through the real video → worker → stitcher → editor path, and the saved `.magpie` matches the source page pixel-for-pixel.
+
+**Smoke tests:** `npm run build -w magpie && apps/desktop/scripts/smoke/run.sh` (needs a display).

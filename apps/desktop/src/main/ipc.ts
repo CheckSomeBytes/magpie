@@ -1,5 +1,5 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron';
-import { CH, type CaptureMode, type LibraryQuery, type OverlaySelection, type SavePayload, type Settings } from '../shared/ipc';
+import { CAPTURE_MODES, CH, type CaptureMode, type LibraryQuery, type OverlaySelection, type SavePayload, type Settings } from '../shared/ipc';
 import { setLaunchAtLogin } from './autostart';
 import { openProjectFile, runCapture } from './capture-flow';
 import { runDoctor } from './doctor';
@@ -8,9 +8,10 @@ import * as library from './library/service';
 import { settings } from './settings';
 import { editorClose, editorCloseReady, editorCopy, editorExportPng, editorInitFor, editorSave } from './windows/editor';
 import { showLibrary } from './windows/library';
+import { scrollCancel, scrollFinish, scrollInit, scrollPhase } from './windows/scroll';
 import { overlayCancel, overlayCommit, overlayInitFor } from './windows/overlay';
 
-const MODES: CaptureMode[] = ['region', 'window', 'full'];
+const MODES: readonly CaptureMode[] = CAPTURE_MODES;
 
 export function setupIpc(): void {
   ipcMain.handle(CH.overlayInit, (e) => overlayInitFor(e.sender));
@@ -44,6 +45,11 @@ export function setupIpc(): void {
     return res.canceled ? null : res.filePaths[0] ?? null;
   });
   ipcMain.handle(CH.runDoctor, () => runDoctor(hotkeyStatus()));
+
+  ipcMain.handle(CH.scrollInit, (e) => scrollInit(e.sender));
+  ipcMain.handle(CH.scrollPhase, (e, phase) => scrollPhase(e.sender, phase));
+  ipcMain.handle(CH.scrollFinish, (e, png: Uint8Array) => scrollFinish(e.sender, png));
+  ipcMain.on(CH.scrollCancel, (e) => scrollCancel(e.sender));
 
   const ids = (v: unknown): number[] => (Array.isArray(v) ? v.filter((x): x is number => Number.isInteger(x)) : []);
   ipcMain.on(CH.openLibrary, () => showLibrary());

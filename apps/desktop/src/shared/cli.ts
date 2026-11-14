@@ -1,4 +1,4 @@
-import type { CaptureMode } from './ipc';
+import { CAPTURE_MODES, type CaptureMode } from './ipc';
 
 export interface CliCommand {
   capture: CaptureMode | null;
@@ -9,10 +9,10 @@ export interface CliCommand {
   library: boolean;
 }
 
-const MODES: readonly CaptureMode[] = ['region', 'window', 'full'];
+const MODES: readonly CaptureMode[] = CAPTURE_MODES;
 
 /**
- * Parse `magpie --capture region|window|full [file.magpie ...]`.
+ * Parse `magpie --capture region|window|full|scroll [file.magpie ...]`.
  * argv is process.argv (or the second-instance argv), so it starts with the
  * executable and, in dev, the app path; we only look at flags and .magpie files.
  */

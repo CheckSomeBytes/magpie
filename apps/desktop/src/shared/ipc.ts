@@ -4,7 +4,14 @@
  */
 import type { AnnotationDoc, AnnotationType, DisplayInfo, Manifest, Rect } from '@magpie/format';
 
-export type CaptureMode = 'region' | 'window' | 'full';
+export const CAPTURE_MODES = ['region', 'window', 'full', 'scroll'] as const;
+export type CaptureMode = (typeof CAPTURE_MODES)[number];
+export const CAPTURE_MODE_LABELS: Record<CaptureMode, string> = {
+  region: 'Region',
+  window: 'Window',
+  full: 'Full screen',
+  scroll: 'Scrolling',
+};
 export type LinuxRegionMode = 'overlay' | 'editor-crop';
 
 export interface Settings {
@@ -78,6 +85,17 @@ export interface DoctorItem {
   message: string;
 }
 
+// ---- Scrolling capture (Phase 3) -------------------------------------------
+
+export type ScrollPhase = 'select' | 'recording' | 'review';
+
+export interface ScrollInit {
+  /** Dev only (MAGPIE_FAKE_SCROLL): a tall PNG to fake a scrolling screen stream from. */
+  fakeTall: Uint8Array | null;
+  /** Hotkey that finishes recording (the scroll hotkey). */
+  stopHotkey: string;
+}
+
 // ---- Library (Phase 2) ----------------------------------------------------
 
 export interface LibraryItem {
@@ -148,6 +166,13 @@ export interface MagpieApi {
   chooseFolder(): Promise<string | null>;
   runDoctor(): Promise<DoctorItem[]>;
 
+  scrollInit(): Promise<ScrollInit>;
+  /** Reshape the scroll window for a phase; resolves once the window has moved out of the way. */
+  scrollPhase(phase: ScrollPhase): Promise<void>;
+  scrollFinish(png: Uint8Array): Promise<void>;
+  scrollCancel(): void;
+  onScrollStop(cb: () => void): () => void;
+
   openLibrary(): void;
   libraryQuery(q: LibraryQuery): Promise<LibraryResult>;
   libraryOverview(): Promise<LibraryOverview>;
@@ -181,6 +206,11 @@ export const CH = {
   suspendHotkeys: 'settings:suspend-hotkeys',
   chooseFolder: 'settings:choose-folder',
   runDoctor: 'app:doctor',
+  scrollInit: 'scroll:init',
+  scrollPhase: 'scroll:phase',
+  scrollFinish: 'scroll:finish',
+  scrollCancel: 'scroll:cancel',
+  scrollStop: 'scroll:stop',
   openLibrary: 'library:open-window',
   libraryQuery: 'library:query',
   libraryOverview: 'library:overview',

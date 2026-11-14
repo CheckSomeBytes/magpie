@@ -17,6 +17,7 @@ export function createTray(): Tray {
     { label: 'Capture Region', click: () => void runCapture('region') },
     { label: 'Capture Window', click: () => void runCapture('window') },
     { label: 'Capture Full Screen', click: () => void runCapture('full') },
+    { label: 'Scrolling Capture', click: () => void runCapture('scroll') },
     { type: 'separator' },
     { label: 'Library…', click: () => showLibrary() },
     { label: 'Open Project…', click: () => void openProjectDialog() },
