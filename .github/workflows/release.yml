@@ -44,7 +44,7 @@ jobs:
         if: runner.os == 'Linux'
         run: npm test
       - name: Build installer
-        run: npm run ${{ matrix.dist }} -- --publish never
+        run: npm run ${{ matrix.dist }} -w magpie -- --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: magpie-${{ runner.os }}

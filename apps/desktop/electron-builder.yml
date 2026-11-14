@@ -1,5 +1,7 @@
 # Packaging (§13). Linux: .deb + AppImage. Windows: NSIS per-user.
 appId: works.telesto.Magpie
+# Never auto-publish; the Release workflow uploads the installers itself.
+publish: null
 productName: Magpie
 directories:
   buildResources: resources
