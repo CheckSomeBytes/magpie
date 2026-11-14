@@ -39,9 +39,27 @@ export function disconnectBus(): void {
   bus = null;
 }
 
-async function call(msg: ConstructorParameters<DBus['Message']>[0]): Promise<unknown[]> {
+/**
+ * A method call that always settles. dbus-next leaves calls pending forever
+ * when the session bus can't be reached (no D-Bus session, broken socket), so
+ * the startup check would hang instead of reporting the problem.
+ */
+async function call(msg: ConstructorParameters<DBus['Message']>[0], timeoutMs = 5000): Promise<unknown[]> {
   const { Message, MessageType } = dbus();
-  const reply = await sessionBus().call(new Message(msg));
+  const b = sessionBus();
+  let timer: NodeJS.Timeout | undefined;
+  let onError: ((err: Error) => void) | undefined;
+  const reply = await Promise.race([
+    b.call(new Message(msg)),
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error('D-Bus session bus did not answer')), timeoutMs);
+      onError = (err) => reject(new Error(`D-Bus session bus unavailable: ${err.message}`));
+      b.once('error', onError);
+    }),
+  ]).finally(() => {
+    clearTimeout(timer);
+    if (onError) b.off('error', onError);
+  });
   if (!reply || reply.type === MessageType.ERROR) {
     throw new Error(`D-Bus error: ${reply?.errorName ?? 'no reply'} ${String(reply?.body?.[0] ?? '')}`);
   }
@@ -118,7 +136,7 @@ export async function portalScreenshot(opts: { interactive: boolean; timeoutMs?:
           modal: new Variant('b', true),
         },
       ],
-    });
+    }, 30_000);
     if (handle !== requestPath) {
       // Old portals (<0.9) return a different path; we'd miss the signal. Surface it loudly.
       console.warn(`[portal] request path mismatch: expected ${requestPath}, got ${String(handle)}`);

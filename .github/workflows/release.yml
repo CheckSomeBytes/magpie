@@ -1,0 +1,76 @@
+# Builds installers on each OS and attaches them to a GitHub release.
+# Each OS builds its own installer because ffmpeg-static downloads the binary
+# for the machine it is installed on.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build (e.g. v1.0.0)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            dist: dist:linux
+            files: |
+              apps/desktop/release/*/*.AppImage
+              apps/desktop/release/*/*.deb
+          - os: windows-latest
+            dist: dist:win
+            files: |
+              apps/desktop/release/*/*.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Unit tests
+        if: runner.os == 'Linux'
+        run: npm test
+      - name: Build installer
+        run: npm run ${{ matrix.dist }} -- --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: magpie-${{ runner.os }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          ls -la dist
+          (cd dist && sha256sum * > SHA256SUMS.txt)
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --title "Magpie ${TAG#v}" --notes-file .github/release-notes.md
+          fi

@@ -30,6 +30,7 @@ linux:
   # or GNOME denies global shortcuts and forgets the screenshot permission.
   syncDesktopName: true
   executableName: magpie
+  maintainer: CheckSomeBytes <CheckSomeBytes@users.noreply.github.com>
   icon: resources/icons
   category: Graphics
   target:

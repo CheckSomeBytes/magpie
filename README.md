@@ -10,7 +10,11 @@ Built from the design doc ("Snagit Alternative — Design Doc", Nov 4 2026):
 - **Phase 4:** offline OCR (Grab text + searchable library), stamps and pasted images, style presets, annotation templates, capture presets.
 - **Phase 5:** screen recording with trim and MP4/GIF export.
 
-## Quick start
+## Download
+
+Installers for Windows 11 (`.exe`) and Ubuntu (`.deb`, AppImage) are on the [Releases page](https://github.com/CheckSomeBytes/magpie/releases/latest). To publish a new one, bump `version` in `apps/desktop/package.json`, then push a tag such as `v1.0.1`. The *Release* workflow builds on both OSes and attaches the installers.
+
+## Quick start (from source)
 
 ```bash
 npm install
